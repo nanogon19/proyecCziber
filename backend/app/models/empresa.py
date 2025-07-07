@@ -11,7 +11,7 @@ class Empresa:
 
         self.admins: List[Admin] = []
         self.empleados: List[Empleado] = []
-        self.aplicaciones= List[Aplicacion] = {}
+        self.aplicaciones: dict[str, Aplicacion] = {}
 
     def agregar_admin(self, admin: Admin):
         self.admins.append(admin)
