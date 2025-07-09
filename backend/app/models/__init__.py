@@ -1,5 +1,5 @@
-from .usuario import Usuario, Admin, Empleado
-from .empresa import Empresa
-from .aplicacion import Aplicacion
-from .modelo_de_datos import ModelDB
-from .consulta import Consulta
+from .user import Usuario, Admin, Empleado
+from .company import Empresa
+from .aplication import Aplicacion
+from .model import ModelDB
+from .query import Consulta
