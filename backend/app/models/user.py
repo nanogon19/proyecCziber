@@ -1,48 +1,51 @@
 from typing import Dict
+from sqlalchemy import Column, String, ForeignKey
+from backend.app.extensions import db
+import uuid
 
-import backend.app.models.query as Query
-import models.model as Model
+class User(db.Model):
+    __tablename__ = 'users'
 
-class User:
-    def __init__(self, id_user: str, name: str, email: str, password: str, recover: str, level: int, active: bool, empresa_id: str):
-        self.id_user = id
-        self.name = name
-        self.email = email
-        self.password = password
-        self.recover = recover
-        self.level = level
-        self.active = active
+    id_user = db.Column(db.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = db.Column(db.String, nullable=False)
+    email = db.Column(db.String, unique=True, nullable=False)
+    password = db.Column(db.String, nullable=False)
+    recover = db.Column(db.String, nullable=True)
+    level = db.Column(db.String, nullable=False)  
+    active = db.Column(db.Boolean, default=True, nullable=False)
+    isAdmin = db.Column(db.Boolean, default=False, nullable=False)
 
-        self.models = dict(str, Model) = {}
-        self.consultas = dict(str, Query) = {}
-        self.empresa_id = empresa_id
+    company_id = db.Column(db.String, db.ForeignKey('companies.id_emp'), nullable=False)
 
-    def add_model(self, model: Model):
-        self.models[model.id] = model
+    company = db.relationship("Company", back_populates="empleados")
+    consultas = db.relationship("Query", back_populates="usuario", lazy=True)
 
-    def get_model(self, model_id: str) -> Model:
-        return self.models.get(model_id)
-    
-    def get_models(self) -> list[str]:
-        return list(self.models.keys())
-    
-    def add_consulta(self, consulta: Query):
-        self.consultas[consulta.id] = consulta
-
-    def get_consulta(self, consulta_id: str) -> Query:
-        return self.consultas.get(consulta_id)
-    
-    def get_consultas(self) -> list[str]:
-        return list(self.consultas.keys())
-    
     def get_empresa_id(self) -> str:
-        return self.empresa_id
+        return self.company_id
     
+    def get_id(self) -> str:
+        return self.id_user
+
     def set_password(self, new_password: str):
         self.password = new_password
 
+    def get_models(self) -> list[str]:
+        """Devuelve los IDs de los modelos accesibles por el usuario a través de su empresa"""
+        return [model.id_model for model in self.company.models]
+
+    def get_models(self) -> list[str]:
+        if not self.company:
+            return []
+        return  [model.id_model for model in self.company.models]
+
+    def get_consultas(self) -> list[str]:
+        """Devuelve una lista de IDs de consultas del usuario"""
+        return [consulta.id for consulta in self.consultas]
+
+    def get_consulta(self, consulta_id: str):
+        """Busca una consulta del usuario por su ID"""
+        return next((c for c in self.consultas if c.id_query == consulta_id), None)
+
     def get_total_tokens(self) -> int:
-        total_tokens = 0
-        for model in self.models.values():
-            total_tokens += model.get_total_tokens()
-        return total_tokens
+        """Suma todos los tokens usados en consultas del usuario"""
+        return sum((c.tokens_in or 0) + (c.tokens_out or 0) for c in self.consultas)    

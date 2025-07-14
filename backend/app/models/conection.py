@@ -1,29 +1,58 @@
-from utils.security import EncryptionManager
+from backend.app.extensions import db
+from backend.app.utils.security import EncryptionManager
+import uuid
+
 encryptor = EncryptionManager()
 
-class Conection:
-    def __init__(self, id: str, ip: str, port: int, user: str, password: str, app_id: str, emp_id: str, model_id: str):
-        self.id = id
-        self.ip = encryptor.encrypt_data(ip)
-        self.port = encryptor.encrypt_data(port)
-        self.user = encryptor.encrypt_data(user)
-        self.password = encryptor.encrypt_data(password)   
+class Conection(db.Model):
+    __tablename__ = "conections"
 
+    id_conn = db.Column(db.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    ip_enc = db.Column("ip", db.String, nullable=False)
+    port_enc = db.Column("port", db.String, nullable=False)
+    user_enc = db.Column("user", db.String, nullable=False)
+    password_enc = db.Column("password", db.String, nullable=False)
+
+    app_id   = db.Column(db.String, db.ForeignKey("applications.id_app"), nullable=False)
+    company_id = db.Column(db.String, db.ForeignKey('companies.id_emp'))
+    model_id = db.Column(db.String, db.ForeignKey("models.id_model"), nullable=False)
+
+    # Relaciones
+    application = db.relationship("Application", back_populates="conections")
+    company    = db.relationship("Company", back_populates="conections")
+    model      = db.relationship("Model", back_populates="conections")
+
+    # Constructor personalizado con cifrado
+    def __init__(self, ip, port, user, password, app_id, emp_id, model_id):
+        self.ip_enc = encryptor.encrypt_data(ip)
+        self.port_enc = encryptor.encrypt_data(str(port))
+        self.user_enc = encryptor.encrypt_data(user)
+        self.password_enc = encryptor.encrypt_data(password)
         self.app_id = app_id
         self.emp_id = emp_id
         self.model_id = model_id
 
+    # Métodos de acceso a datos desencriptados
     def obtener_ip(self) -> str:
-        return encryptor.decrypt(self.ip)
+        return encryptor.decrypt(self.ip_enc)
     
     def obtener_port(self) -> int:
-        return encryptor.decrypt(self.port)
+        return int(encryptor.decrypt(self.port_enc))
 
     def obtener_usuario(self) -> str:
-        return encryptor.decrypt(self.usuario)
+        return encryptor.decrypt(self.user_enc)
     
     def obtener_clave(self) -> str:
-        return encryptor.decrypt(self.clave)
-    
-    
-    
+        return encryptor.decrypt(self.password_enc)
+
+    def to_dict(self) -> dict:
+        return {
+            "id_conn": self.id_conn,
+            "ip": self.obtener_ip(),
+            "port": self.obtener_port(),
+            "user": self.obtener_usuario(),
+            "password": self.obtener_clave(),
+            "app_id": self.app_id,
+            "emp_id": self.emp_id,
+            "model_id": self.model_id
+        }
