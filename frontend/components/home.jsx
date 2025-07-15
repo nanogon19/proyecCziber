@@ -6,20 +6,61 @@ function Home() {
   const [currentPage, setCurrentPage] = React.useState("home");
   const hoverTimeout = React.useRef(null);
 
-    const handleSend = () => {
+    const handleSend = async () => {
         if (!input.trim()) return;
 
-        setMessages((prev) => [...prev, { sender: "user", text: input }]);
+        const newUserMessage = { sender: "user", text: input };
+        setMessages((prev) => [...prev, newUserMessage]);
         setInput("");
 
-        setTimeout(() => {
-            const dbPrefix = selectedDB ? `<span class="db-badge">📁 ${selectedDB}</span><br/>` : "";
-            const respuesta = `${dbPrefix}Esta es una respuesta simulada de la IA.`;
-            setMessages((prev) => [
-            ...prev,
-            { sender: "bot", text: respuesta, isHTML: true },
+        try {
+            const response = await fetch("http://localhost:8000/consultar", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ prompt: input }),
+            });
+
+            const contentType = response.headers.get("Content-Type");
+
+            if (contentType === "application/pdf") {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const filename = response.headers.get("Content-Disposition")?.split("filename=")[1] || "resultado.pdf";
+
+            // Agregamos al chat un link para descargar el PDF
+                const pdfMessage = {
+                    sender: "bot",
+                    text: `📝 <a href="${url}" download="${filename}">Descargar resultado en PDF</a>`,
+                    isHTML: true,
+                };
+                setMessages((prev) => [...prev, pdfMessage]);
+
+            } else {
+                const data = await response.json();
+                const mensaje = data.mensaje || data.error || "❌ Error inesperado.";
+                const sql = data.sql ? `<br/><small><code>${data.sql}</code></small>` : "";
+
+                setMessages((prev) => [
+                ...prev,
+                {
+                    sender: "bot",
+                    text: `⚠️ ${mensaje}${sql}`,
+                    isHTML: true,
+                },
                 ]);
-        }, 1000);
+            }
+        } catch (error) {
+                console.error("Error al conectar con el backend:", error);
+                setMessages((prev) => [
+                ...prev,
+                {
+                sender: "bot",
+                text: "❌ No se pudo conectar con el servidor.",
+                },
+            ]);
+        }
     };
 
     const handleKeyDown = (e) => {
