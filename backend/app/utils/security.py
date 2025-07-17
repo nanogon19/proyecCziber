@@ -8,7 +8,7 @@ class EncryptionManager:
     def __init__(self):
         key = os.getenv("ENC_KEY")
         if not key:
-            raise ValueError("No SECRET_KEY found in environment variables.")
+            raise ValueError("No ENC_KEY found in environment variables.")
         self.fernet = Fernet(key.encode())
 
     def encrypt_data(self, data: str) -> str:

@@ -2,7 +2,7 @@ from backend.app.extensions import db
 from backend.app.utils.security import EncryptionManager
 import uuid
 
-encryptor = EncryptionManager()
+# encryptor = EncryptionManager()
 
 class Conection(db.Model):
     __tablename__ = "conections"
