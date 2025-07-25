@@ -14,7 +14,7 @@ function Home() {
         setInput("");
 
         try {
-            const response = await fetch("http://localhost:8000/consultar", {
+            const response = await fetch("http://localhost:5000/cziber/consultar", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -39,14 +39,14 @@ function Home() {
 
             } else {
                 const data = await response.json();
-                const mensaje = data.mensaje || data.error || "❌ Error inesperado.";
+                const mensaje = data.mensaje || data.error || "Error inesperado.";
                 const sql = data.sql ? `<br/><small><code>${data.sql}</code></small>` : "";
 
                 setMessages((prev) => [
                 ...prev,
                 {
                     sender: "bot",
-                    text: `⚠️ ${mensaje}${sql}`,
+                    text: `${mensaje}${sql}`,
                     isHTML: true,
                 },
                 ]);
@@ -64,7 +64,10 @@ function Home() {
     };
 
     const handleKeyDown = (e) => {
-        if (e.key === "Enter") handleSend();
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+        }
     };
 
     const handleSelectDB = (dbName) => {

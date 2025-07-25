@@ -14,6 +14,9 @@ from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import create_engine, inspect, text
 from openai import OpenAI
 
+from flask_cors import CORS
+CORS(app)
+
 from dotenv import load_dotenv
 load_dotenv()
 

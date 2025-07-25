@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>DataSage</title>
+  <link rel="stylesheet" href="../styles/consulta.css">
+</head>
+<body>
+  <div class="sidebar">
+    <h2>Consultas anteriores</h2>
+  </div>
+  <div class="main-container">
+    <header class="header">
+      <div class="logo">DATASAGE</div>
+      <img src="../static/img/logo.png" alt="Logo" class="logo-img">
+    </header>
+
+    <div class="chat-box" id="chatBox">
+      <!-- Aquí irían respuestas si decides mostrarlas -->
+    </div>
+
+    <form id="consulta-form" class="input-area">
+      <textarea id="prompt" placeholder="Escriba su consulta aquí..."></textarea>
+      <button type="submit">Enviar</button>
+    </form>
+  </div>
+  <script>
+document.getElementById('consulta-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const prompt = document.getElementById('prompt').value;
+
+  try {
+    const response = await fetch('http://localhost:5000/cziber/consultar', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ prompt })
+    });
+
+    if (!response.ok) {
+      // Error amigable si el backend falla
+      const errorText = await response.text(); // capturamos el texto crudo
+      console.warn("Error del servidor:", errorText);
+      alert("Problema al procesar la grilla respuesta de la consulta. Por favor, verifica tu conexión o intenta más tarde.");
+      return;
+    }
+
+    // Si todo bien, genera el PDF
+    const blob = await response.blob();
+    const fileURL = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = fileURL;
+    link.download = 'consulta.pdf';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(fileURL);
+  } catch (err) {
+    console.error("Error en la solicitud:", err);
+    alert("Error inesperado. Verifica tu conexión o intenta más tarde.");
+  }
+});
+  </script>
+</body>
+</html>

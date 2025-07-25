@@ -5,6 +5,8 @@ import os
 import openai
 from openai import OpenAI
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')  # Evita problemas con el backend de matplotlib en servidores sin GUI
 import pandas as pd
 import re
 from sqlalchemy import inspect, text, create_engine
@@ -294,7 +296,7 @@ def consultar():
     Base de datos:
     {esquema}
     Usuario dice: {prompt_usuario}
-    Si la consulta es válida, devuelve la consulta MS SQL completa, sin ninguna explicacion.
+    Si la consulta es válida, devuelve la consulta MS SQL completa, sin ninguna explicacion. No inventes relaciones ni tablas que no existan.
     En caso de que la consulta no sea válida, devuelve el siguiente mensaje de error: Consulta inválida, por favor intente nuevamente.
     """
 
@@ -304,14 +306,13 @@ def consultar():
     response = client.chat.completions.create(
         model="gpt-4-turbo",
         messages=[
-            {"role": "system", "content": "Sos un asistente que genera MS SQL válido basado en el esquema provisto."},
+            {"role": "system", "content": "Sos un asistente que genera MS SQL válido basado en el esquema provisto. No inventes relaciones ni tablas que no existan."},
             {"role": "user", "content": prompt_completo}
         ]
     )
 
     sql_generado = response.choices[0].message.content.strip()
 
-    # Limpieza de delimitadores ```sql
     if sql_generado.startswith("```"):
         sql_generado = sql_generado.strip("`").strip()
         if sql_generado.lower().startswith("sql"):
@@ -340,7 +341,7 @@ def consultar():
     title_pdf = title_pdf.replace(" ", "_")
     title_pdf = title_pdf.lower()
     title_res = f"{title_pdf}.pdf"
-    # 📦 Ejecutar la consulta SQL y generar PDF si hay resultados
+   
     tokens_in  = response.usage.prompt_tokens + response_title.usage.prompt_tokens
     tokens_out = response.usage.completion_tokens + response_title.usage.completion_tokens
 
@@ -352,7 +353,7 @@ def consultar():
             df = pd.DataFrame(resultado.fetchall(), columns=resultado.keys())
 
             if df.empty:
-                return {"sql": sql_generado, "mensaje": "⚠️ Consulta válida, pero sin resultados."}
+                return {"sql": sql_generado, "mensaje": "Consulta válida, pero sin resultados."}
             
             else:
                 # Agregar la consulta a la base de datos
@@ -371,9 +372,12 @@ def consultar():
                 return send_file(
                     title_res,
                     mimetype="application/pdf",
-                    download_name=title_res,  # Opcional, muestra ese nombre en el visor del navegador
-                    as_attachment=False       # ✅ Clave: NO forzar descarga
+                    download_name=title_res,  
+                    as_attachment=False       
                 )   
 
     except Exception as e:
-        return {"error": str(e), "sql": sql_generado}
+        return jsonify({
+            "error": str(e),
+            "sql": sql_generado
+        }), 500
