@@ -296,7 +296,7 @@ def consultar():
     Base de datos:
     {esquema}
     Usuario dice: {prompt_usuario}
-    Si la consulta es válida, devuelve la consulta MS SQL completa, sin ninguna explicacion. No inventes relaciones ni tablas que no existan.
+    Si la consulta es válida, devuelve la consulta MS SQL completa, sin ninguna explicacion. No inventes relaciones ni tablas ni columnas que no existan.
     En caso de que la consulta no sea válida, devuelve el siguiente mensaje de error: Consulta inválida, por favor intente nuevamente.
     """
 
@@ -306,7 +306,7 @@ def consultar():
     response = client.chat.completions.create(
         model="gpt-4-turbo",
         messages=[
-            {"role": "system", "content": "Sos un asistente que genera MS SQL válido basado en el esquema provisto. No inventes relaciones ni tablas que no existan."},
+            {"role": "system", "content": "Sos un asistente que genera MS SQL válido basado en el esquema provisto. No inventes relaciones ni tablas ni columnas que no existan."},
             {"role": "user", "content": prompt_completo}
         ]
     )
@@ -350,9 +350,14 @@ def consultar():
             resultado = conn.execute(text(sql_generado))
             print(f"Resultados obtenidos: {resultado.rowcount} filas")
 
-            df = pd.DataFrame(resultado.fetchall(), columns=resultado.keys())
+            rows = resultado.fetchall()
+            columns = list(resultado.keys())
+            data = [list(row) for row in rows]
 
-            if df.empty:
+            print(f"Columnas obtenidas: {columns}")
+            print(f"Datos obtenidos: {data}")
+
+            if not rows:
                 return {"sql": sql_generado, "mensaje": "Consulta válida, pero sin resultados."}
             
             else:
@@ -368,13 +373,18 @@ def consultar():
                 # db.session.add(query)
                 # db.session.commit()
 
-                generar_pdf_tabla(df, ruta_salida=title_res)
-                return send_file(
-                    title_res,
-                    mimetype="application/pdf",
-                    download_name=title_res,  
-                    as_attachment=False       
-                )   
+                #generar_pdf_tabla(df, ruta_salida=title_res)
+                #return send_file(
+                #    title_res,
+                #    mimetype="application/pdf",
+                #    download_name=title_res,  
+                #    as_attachment=False       
+                #)
+                return jsonify({
+                    "columns": columns,
+                    "data": data
+                })  
+
 
     except Exception as e:
         return jsonify({

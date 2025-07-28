@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <title>DataSage</title>
   <link rel="stylesheet" href="../styles/consulta.css">
+  <link href="https://unpkg.com/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
+  <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
   <div class="sidebar">
@@ -15,7 +18,7 @@
       <img src="../static/img/logo.png" alt="Logo" class="logo-img">
     </header>
 
-    <div class="chat-box" id="chatBox">
+    <div class="result-box" id="resultBox">
       <!-- Aquí irían respuestas si decides mostrarlas -->
     </div>
 
@@ -25,9 +28,15 @@
     </form>
   </div>
   <script>
-document.getElementById('consulta-form').addEventListener('submit', async function (e) {
-  e.preventDefault();
-  const prompt = document.getElementById('prompt').value;
+    document.getElementById('consulta-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const prompt = document.getElementById('prompt').value;
+
+    const chatBox = document.getElementById('chatBox');
+    const mensaje = document.createElement('div');
+    mensaje.textContent = prompt;
+    mensaje.classList.add('user-message');
+    resultBox.appendChild(mensaje);
 
   try {
     const response = await fetch('http://localhost:5000/cziber/consultar', {
@@ -38,27 +47,51 @@ document.getElementById('consulta-form').addEventListener('submit', async functi
       body: JSON.stringify({ prompt })
     });
 
-    if (!response.ok) {
-      // Error amigable si el backend falla
-      const errorText = await response.text(); // capturamos el texto crudo
-      console.warn("Error del servidor:", errorText);
-      alert("Problema al procesar la grilla respuesta de la consulta. Por favor, verifica tu conexión o intenta más tarde.");
-      return;
+    const json = await response.json();
+    console.log("Respuesta del servidor:", json);
+    if (json.mensaje) {
+        alert(json.mensaje);
+        return;
     }
+    const {columns, data} = json;
+    
+    const resultBox = document.getElementById('resultBox');
+    resultBox.innerHTML = ''; // Limpiar resultados anteriores
 
-    // Si todo bien, genera el PDF
-    const blob = await response.blob();
-    const fileURL = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = fileURL;
-    link.download = 'consulta.pdf';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(fileURL);
-  } catch (err) {
-    console.error("Error en la solicitud:", err);
-    alert("Error inesperado. Verifica tu conexión o intenta más tarde.");
+    const gridContainer = document.createElement('div');
+    gridContainer.id = 'gridjs';
+    resultBox.appendChild(gridContainer); 
+    
+    new gridjs.Grid({
+      columns: columns,
+      data: data,
+      pagination: false,
+      search: true,
+      sort: true,
+      resizable: false,
+      fixedHeader: true,
+      height: '200px',
+    }).render(document.getElementById('gridjs'));
+
+    const exportButton = document.createElement('button');
+    exportButton.textContent = 'Exportar a Excel';
+
+    exportButton.classList.add('export-btn');
+    exportButton.addEventListener("click", function () {
+      const worksheetData = [columns, ...data]; // Primera fila: encabezados
+      const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Resultado");
+
+      const filename = `consulta_${Date.now()}.xlsx`;
+      XLSX.writeFile(workbook, filename);
+    });
+
+    resultBox.appendChild(exportButton);
+  
+  } catch (e) {
+    console.error("Error al enviar la consulta:", e);
+    alert ("Error al enviar la consulta. Por favor, inténtelo de nuevo.");
   }
 });
   </script>
