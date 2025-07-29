@@ -10,9 +10,7 @@ matplotlib.use('Agg')  # Evita problemas con el backend de matplotlib en servido
 import pandas as pd
 import re
 from sqlalchemy import inspect, text, create_engine
-from backend.app.extensions import db
 import fitz
-
 from backend.app.extensions import db
 
 from backend.app.models.application import Application
@@ -122,7 +120,7 @@ def registrar_modelo():
         nombre=nombre,
         documentacion=documentacion,
         version=version,
-        emp_id=emp_id,
+        company_id=emp_id,
         app_id=app_id
     )
 
@@ -131,6 +129,8 @@ def registrar_modelo():
 
     db.session.add(nuevo_modelo)
     db.session.commit()
+    
+    return jsonify({"message": "Modelo registrado exitosamente", "id_model": nuevo_modelo.id_model}), 201
     
 @cziber_bp.route("/registrar_conexion", methods=["POST"])
 def registrar_conexion():
@@ -166,7 +166,7 @@ def registrar_conexion():
         user=usuario,
         password=clave,
         app_id=app_id,
-        emp_id=emp_id,
+        company_id=emp_id,
         model_id=model_id
     )    
 
@@ -177,6 +177,8 @@ def registrar_conexion():
     db.session.add(new_conection)
     db.session.commit()
     
+    return jsonify({"message": "Conexión registrada exitosamente", "id_conn": new_conection.id_conn}), 201
+    
 @cziber_bp.route("/listar_modelos", methods=["GET"])
 def listar_modelos():  
     emp_id = request.args.get("emp_id")
@@ -185,7 +187,7 @@ def listar_modelos():
     if not emp_id or not app_id:
         return jsonify({"error": "Missing emp_id or app_id parameter"}), 400
 
-    modelos = Model.query.filter_by(empresa_id=emp_id, app_id=app_id).all()
+    modelos = Model.query.filter_by(company_id=emp_id, app_id=app_id).all()
 
     modelos_serializados = [{
         "id_model": m.id_model,
@@ -202,23 +204,95 @@ def listar_conexiones():
     emp_id = request.args.get("emp_id")
     app_id = request.args.get("app_id")
 
-    if not emp_id or not app_id:
-        return jsonify({"error": "Faltan parámetros emp_id o app_id"}), 400
+    # Si no se proporciona emp_id, error
+    if not emp_id:
+        return jsonify({"error": "Falta el parámetro emp_id"}), 400
 
-    conexiones = Conection.query.filter_by(emp_id=emp_id, app_id=app_id).all()
+    # Si se proporciona app_id, filtrar por empresa y aplicación
+    if app_id:
+        conexiones = Conection.query.filter_by(company_id=emp_id, app_id=app_id).all()
+    else:
+        # Si no se proporciona app_id, listar todas las conexiones de la empresa
+        conexiones = Conection.query.filter_by(company_id=emp_id).all()
 
     conexiones_serializadas = []
     for con in conexiones:
-        conexiones_serializadas.append({
+        # Obtener información del modelo asociado
+        modelo = Model.query.get(con.model_id)
+        aplicacion = Application.query.get(con.app_id)
+        
+        conexion_data = {
             "id_conn": con.id_conn,
             "ip": con.obtener_ip(),
             "puerto": con.obtener_port(),
             "usuario": con.obtener_usuario(),
             "clave": con.obtener_clave(),
-            "modelo_id": con.model_id
-        })
+            "modelo_id": con.model_id,
+            "app_id": con.app_id,
+            "company_id": con.company_id
+        }
+        
+        # Agregar información del modelo si existe
+        if modelo:
+            conexion_data["modelo_nombre"] = modelo.nombre
+            conexion_data["modelo_version"] = modelo.version
+        
+        # Agregar información de la aplicación si existe
+        if aplicacion:
+            conexion_data["aplicacion_nombre"] = aplicacion.nombre
+            
+        conexiones_serializadas.append(conexion_data)
 
     return jsonify({"conexiones": conexiones_serializadas}), 200
+
+@cziber_bp.route("/listar_todas_conexiones", methods=["GET"])
+def listar_todas_conexiones():
+    """
+    Lista todas las conexiones disponibles en el sistema
+    """
+    try:
+        conexiones = Conection.query.all()
+        
+        conexiones_serializadas = []
+        for con in conexiones:
+            # Obtener información relacionada
+            modelo = Model.query.get(con.model_id)
+            aplicacion = Application.query.get(con.app_id)
+            empresa = Company.query.get(con.company_id)
+            
+            conexion_data = {
+                "id_conn": con.id_conn,
+                "ip": con.obtener_ip(),
+                "puerto": con.obtener_port(),
+                "usuario": con.obtener_usuario(),
+                "clave": con.obtener_clave(),
+                "modelo_id": con.model_id,
+                "app_id": con.app_id,
+                "company_id": con.company_id
+            }
+            
+            # Agregar información del modelo si existe
+            if modelo:
+                conexion_data["modelo_nombre"] = modelo.nombre
+                conexion_data["modelo_version"] = modelo.version
+            
+            # Agregar información de la aplicación si existe
+            if aplicacion:
+                conexion_data["aplicacion_nombre"] = aplicacion.nombre
+                
+            # Agregar información de la empresa si existe
+            if empresa:
+                conexion_data["empresa_nombre"] = empresa.name
+                
+            conexiones_serializadas.append(conexion_data)
+
+        return jsonify({
+            "conexiones": conexiones_serializadas,
+            "total": len(conexiones_serializadas)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": f"Error al obtener conexiones: {str(e)}"}), 500
 
 @cziber_bp.route("/get_tokens_from_company", methods=["GET"])
 def get_tokens_from_company():
@@ -304,7 +378,7 @@ def consultar():
     client = OpenAI(api_key=openai.api_key)
 
     response = client.chat.completions.create(
-        model="gpt-4-turbo",
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": "Sos un asistente que genera MS SQL válido basado en el esquema provisto. No inventes relaciones ni tablas ni columnas que no existan."},
             {"role": "user", "content": prompt_completo}
@@ -404,3 +478,89 @@ def listar_aplicaciones():
         return jsonify({
             "error": str(e)
         }), 500
+
+@cziber_bp.route("/agregar_conexion", methods=["POST"])
+def agregar_conexion():
+    """
+    Crear una nueva conexión en el sistema
+    """
+    try:
+        data = request.json
+        
+        # Validar datos requeridos
+        required_fields = ["ip", "port", "user", "password", "app_id", "company_id", "model_id"]
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"Campo requerido faltante: {field}"}), 400
+        
+        # Verificar que las relaciones existan
+        app = Application.query.get(data["app_id"])
+        if not app:
+            return jsonify({"error": "Aplicación no encontrada"}), 404
+            
+        company = Company.query.get(data["company_id"])
+        if not company:
+            return jsonify({"error": "Empresa no encontrada"}), 404
+            
+        model = Model.query.get(data["model_id"])
+        if not model:
+            return jsonify({"error": "Modelo no encontrado"}), 404
+        
+        # Crear nueva conexión
+        nueva_conexion = Conection(
+            ip=data["ip"],
+            port=data["port"],
+            user=data["user"],
+            password=data["password"],
+            app_id=data["app_id"],
+            company_id=data["company_id"],
+            model_id=data["model_id"]
+        )
+        
+        db.session.add(nueva_conexion)
+        db.session.commit()
+        
+        return jsonify({
+            "message": "Conexión creada exitosamente",
+            "id_conn": nueva_conexion.id_conn
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Error al crear conexión: {str(e)}"}), 500
+
+@cziber_bp.route("/listar_empresas_dropdown", methods=["GET"])
+def listar_empresas_dropdown():
+    """
+    Lista empresas para dropdown del formulario
+    """
+    try:
+        empresas = Company.query.all()
+        empresas_list = [{"id": emp.id_emp, "name": emp.name} for emp in empresas]
+        return jsonify({"empresas": empresas_list}), 200
+    except Exception as e:
+        return jsonify({"error": f"Error al obtener empresas: {str(e)}"}), 500
+
+@cziber_bp.route("/listar_aplicaciones_dropdown", methods=["GET"])
+def listar_aplicaciones_dropdown():
+    """
+    Lista aplicaciones para dropdown del formulario
+    """
+    try:
+        aplicaciones = Application.query.all()
+        apps_list = [{"id": app.id_app, "name": app.nombre} for app in aplicaciones]
+        return jsonify({"aplicaciones": apps_list}), 200
+    except Exception as e:
+        return jsonify({"error": f"Error al obtener aplicaciones: {str(e)}"}), 500
+
+@cziber_bp.route("/listar_modelos_dropdown", methods=["GET"])
+def listar_modelos_dropdown():
+    """
+    Lista modelos para dropdown del formulario
+    """
+    try:
+        modelos = Model.query.all()
+        modelos_list = [{"id": model.id_model, "name": model.nombre, "version": model.version} for model in modelos]
+        return jsonify({"modelos": modelos_list}), 200
+    except Exception as e:
+        return jsonify({"error": f"Error al obtener modelos: {str(e)}"}), 500

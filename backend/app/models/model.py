@@ -11,7 +11,7 @@ class Model(db.Model):
     version = db.Column(db.String)
 
     company_id = db.Column(db.String, db.ForeignKey('companies.id_emp'))
-    app_id     = db.Column(db.String, db.ForeignKey("applications.id_app"), nullable=False)
+    app_id = db.Column(db.String, db.ForeignKey("applications.id_app"), nullable=False)
 
     # Relaciones bidireccionales
     company     = db.relationship("Company", back_populates="models")       # si usás 'empresa_id'
@@ -27,13 +27,16 @@ class Model(db.Model):
         self.documentacion = contexto
         self.version = version
 
+    def agregar_conexion(self, conexion):
+        self.conections.append(conexion)
+
     def to_dict(self) -> dict:
         return {
             "id_model": self.id_model,
             "nombre": self.nombre,
             "documentacion": self.documentacion,
             "version": self.version,
-            "empresa_id": self.empresa_id,
+            "company_id": self.company_id,
             "app_id": self.app_id
         }
 

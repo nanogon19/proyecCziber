@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>DataSage</title>
+  <link rel="stylesheet" href="../styles/consulta.css">
+  <link href="https://unpkg.com/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
+  <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  
+  <!-- React y Babel -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root">
+    <div style="padding: 20px; text-align: center; background: #444; color: white; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+      <h2>Cargando DataSage...</h2>
+      <p>Si esta página no se carga completamente, revisa la consola del navegador (F12).</p>
+      <div style="margin-top: 20px;">
+        <div style="display: inline-block; width: 20px; height: 20px; background: #f4b142; border-radius: 50%; animation: bounce 1s infinite;"></div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @keyframes bounce {
+      0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0);
+      }
+      40% {
+        transform: translateY(-10px);
+      }
+      60% {
+        transform: translateY(-5px);
+      }
+    }
+  </style>
+
+  <!-- Carga el componente React directamente embebido -->
+  <script type="text/babel">
+    function DataSageHome() {
+      const [prompt, setPrompt] = React.useState("");
+      const [results, setResults] = React.useState([]);
+      const [showConexiones, setShowConexiones] = React.useState(false);
+      const [conexiones, setConexiones] = React.useState([]);
+      const [loading, setLoading] = React.useState(false);
+      const [currentView, setCurrentView] = React.useState("listar");
+      const [formData, setFormData] = React.useState({
+        ip: "",
+        port: "",
+        user: "",
+        password: "",
+        app_id: "",
+        company_id: "",
+        model_id: ""
+      });
+      const [empresas, setEmpresas] = React.useState([]);
+      const [aplicaciones, setAplicaciones] = React.useState([]);
+      const [modelos, setModelos] = React.useState([]);
+
+      // Agregar datos de prueba para testing
+      const addTestData = () => {
+        const testResult = {
+          id: Date.now(),
+          prompt: "SELECT * FROM usuarios LIMIT 5",
+          columns: ["ID", "Nombre", "Email", "Fecha"],
+          data: [
+            [1, "Juan Pérez", "juan@email.com", "2024-01-01"],
+            [2, "María García", "maria@email.com", "2024-01-02"],
+            [3, "Carlos López", "carlos@email.com", "2024-01-03"],
+            [4, "Ana Martín", "ana@email.com", "2024-01-04"],
+            [5, "Luis Rodríguez", "luis@email.com", "2024-01-05"]
+          ],
+          timestamp: new Date().toLocaleString()
+        };
+        setResults(prev => [testResult, ...prev]);
+      };
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!prompt.trim()) return;
+
+        try {
+          const response = await fetch('http://localhost:5000/cziber/consultar', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ prompt })
+          });
+
+          const json = await response.json();
+          console.log("Respuesta del servidor:", json);
+          
+          if (json.mensaje) {
+            alert(json.mensaje);
+            return;
+          }
+
+          const { columns, data } = json;
+          
+          // Agregar resultado a la lista
+          const newResult = {
+            id: Date.now(),
+            prompt: prompt,
+            columns: columns,
+            data: data,
+            timestamp: new Date().toLocaleString()
+          };
+
+          setResults(prev => [newResult, ...prev]);
+          setPrompt("");
+
+        } catch (error) {
+          console.error("Error al enviar la consulta:", error);
+          alert("Error al enviar la consulta. Por favor, inténtelo de nuevo.");
+        }
+      };
+
+      const exportToExcel = React.useCallback((result) => {
+        const worksheetData = [result.columns, ...result.data];
+        const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Resultado");
+
+        const filename = `consulta_${Date.now()}.xlsx`;
+        XLSX.writeFile(workbook, filename);
+      }, []);
+
+      // Definir DataGrid antes de usarlo en useMemo
+      const DataGrid = React.memo(({ columns, data }) => {
+        const gridRef = React.useRef(null);
+        const gridInstanceRef = React.useRef(null);
+
+        React.useEffect(() => {
+          console.log("DataGrid useEffect ejecutado - ID de datos:", data?.[0]?.[0]);
+          
+          if (gridRef.current && columns && data && columns.length > 0 && data.length > 0) {
+            // Si ya existe una instancia del grid, destruirla primero
+            if (gridInstanceRef.current) {
+              try {
+                gridInstanceRef.current.destroy();
+              } catch (e) {
+                console.log("Error al destruir grid anterior:", e);
+              }
+            }
+            
+            gridRef.current.innerHTML = '';
+            
+            try {
+              const grid = new gridjs.Grid({
+                columns: columns,
+                data: data,
+                pagination: {
+                  enabled: true,
+                  limit: 10
+                },
+                search: true,
+                sort: true,
+                resizable: true,
+                fixedHeader: true,
+                height: '400px',
+                width: '100%',
+                style: {
+                  table: {
+                    'border-radius': '10px',
+                    'overflow': 'hidden',
+                    'box-shadow': '0 2px 10px rgba(0, 0, 0, 0.1)',
+                    'width': '100%'
+                  },
+                  th: {
+                    'background-color': '#f4b142',
+                    'color': '#fff',
+                    'text-align': 'center',
+                    'padding': '12px'
+                  },
+                  td: {
+                    'text-align': 'center',
+                    'padding': '8px'
+                  }
+                }
+              });
+              
+              grid.render(gridRef.current);
+              gridInstanceRef.current = grid;
+              console.log("Grid renderizado exitosamente");
+            } catch (error) {
+              console.error('Error rendering grid:', error);
+              gridRef.current.innerHTML = '<p style="color: red; padding: 20px;">Error al cargar la tabla: ' + error.message + '</p>';
+            }
+          }
+
+          // Cleanup function
+          return () => {
+            if (gridInstanceRef.current) {
+              try {
+                gridInstanceRef.current.destroy();
+              } catch (e) {
+                console.log("Error en cleanup del grid:", e);
+              }
+            }
+          };
+        }, [columns, data]);
+
+        return (
+          <div className="grid-container">
+            <div ref={gridRef}></div>
+          </div>
+        );
+      });
+
+      // Memoizar los resultados para evitar re-renders
+      const memoizedResults = React.useMemo(() => results, [results.length, results.map(r => r.id).join(',')]);
+      
+      // Memoizar el componente ResultBox completo
+      const ResultBox = React.useMemo(() => {
+        return (
+          <div className="result-box" id="resultBox">
+            {memoizedResults.length === 0 ? (
+              <div className="no-results">
+                <p>No hay consultas realizadas aún. Escribe una consulta para comenzar.</p>
+              </div>
+            ) : (
+              memoizedResults.map((result) => (
+                <div key={result.id} className="result-item">
+                  <div className="result-header">
+                    <h3>Consulta: {result.prompt}</h3>
+                    <button 
+                      className="export-btn"
+                      onClick={() => exportToExcel(result)}
+                    >
+                      Exportar a Excel
+                    </button>
+                  </div>
+                  <DataGrid columns={result.columns} data={result.data} />
+                </div>
+              ))
+            )}
+          </div>
+        );
+      }, [memoizedResults, exportToExcel]);
+
+      const listarConexiones = async () => {
+        setLoading(true);
+        try {
+          const response = await fetch("http://localhost:5000/cziber/listar_todas_conexiones", {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setConexiones(data.conexiones);
+            console.log("Conexiones obtenidas:", data.conexiones);
+          } else {
+            const errorData = await response.json();
+            console.error("Error al obtener conexiones:", errorData.error);
+            alert("Error al obtener conexiones: " + errorData.error);
+          }
+        } catch (error) {
+          console.error("Error al conectar con el backend:", error);
+          alert("No se pudo conectar con el servidor");
+        }
+        setLoading(false);
+      };
+
+      const cargarDatosFormulario = async () => {
+        try {
+          // Cargar empresas
+          const empResponse = await fetch("http://localhost:5000/cziber/listar_empresas_dropdown");
+          if (empResponse.ok) {
+            const empData = await empResponse.json();
+            setEmpresas(empData.empresas);
+          }
+
+          // Cargar aplicaciones
+          const appResponse = await fetch("http://localhost:5000/cziber/listar_aplicaciones_dropdown");
+          if (appResponse.ok) {
+            const appData = await appResponse.json();
+            setAplicaciones(appData.aplicaciones);
+          }
+
+          // Cargar modelos
+          const modelResponse = await fetch("http://localhost:5000/cziber/listar_modelos_dropdown");
+          if (modelResponse.ok) {
+            const modelData = await modelResponse.json();
+            setModelos(modelData.modelos);
+          }
+        } catch (error) {
+          console.error("Error cargando datos del formulario:", error);
+        }
+      };
+
+      const handleSubmitConexion = async (e) => {
+        e.preventDefault();
+        
+        try {
+          const response = await fetch("http://localhost:5000/cziber/agregar_conexion", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(formData)
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            alert("Conexión creada exitosamente!");
+            setFormData({
+              ip: "",
+              port: "",
+              user: "",
+              password: "",
+              app_id: "",
+              company_id: "",
+              model_id: ""
+            });
+            // Actualizar la lista de conexiones
+            listarConexiones();
+          } else {
+            const errorData = await response.json();
+            alert("Error al crear conexión: " + errorData.error);
+          }
+        } catch (error) {
+          console.error("Error creando conexión:", error);
+          alert("Error al conectar con el servidor");
+        }
+      };
+
+      const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+          ...prev,
+          [name]: value
+        }));
+      };
+
+      return (
+        <div className="app-container">
+          <div className="sidebar">
+            <header>
+              <p 
+                className="conexiones" 
+                onClick={() => {
+                  setShowConexiones(true);
+                  setCurrentView("listar");
+                  listarConexiones();
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                Conexiones
+              </p>
+            </header>
+            <h2>Consultas anteriores</h2>
+            <div className="previous-queries">
+              {results.length === 0 ? (
+                <div className="no-queries">
+                  <p>No hay consultas anteriores</p>
+                </div>
+              ) : (
+                results.map((result, index) => (
+                  <div key={result.id} className="query-item">
+                    <div className="query-text">
+                      {result.prompt.length > 50 ? 
+                        `${result.prompt.substring(0, 50)}...` : 
+                        result.prompt
+                      }
+                    </div>
+                    <div className="query-time">
+                      {result.timestamp}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="main-container">
+            <header className="header">
+              <div className="logo">DATASAGE</div>
+              <img src="../static/img/logo.png" alt="Logo" className="logo-img" />
+            </header>
+
+            {ResultBox}
+
+            <form onSubmit={handleSubmit} className="input-area">
+              <textarea 
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Escriba su consulta aquí..."
+                rows="3"
+              />
+              <button type="submit" disabled={!prompt.trim()}>
+                Enviar
+              </button>
+            </form>
+          </div>
+
+          {/* Modal de Conexiones */}
+          {showConexiones && (
+            <div className="modal-conexiones">
+              <div className="contenido-conexiones">
+                <span 
+                  className="cerrar"
+                  onClick={() => setShowConexiones(false)}
+                >
+                  &times;
+                </span>
+                <h2>Conexiones</h2>
+                
+                <div className="opciones-conexiones">
+                  <p 
+                    className={`conexion-op ${currentView === 'listar' ? 'active' : ''}`}
+                    onClick={() => {
+                      setCurrentView("listar");
+                      listarConexiones();
+                    }}
+                  >
+                    Listar conexiones
+                  </p>
+                  <p 
+                    className={`conexion-op ${currentView === 'agregar' ? 'active' : ''}`}
+                    onClick={() => {
+                      setCurrentView("agregar");
+                      cargarDatosFormulario();
+                    }}
+                  >
+                    Agregar conexión
+                  </p>
+                </div>
+
+                <div className="conexiones-content">
+                  {currentView === "listar" ? (
+                    <div className="conexiones-list">
+                      {loading ? (
+                        <div className="loading">Cargando conexiones...</div>
+                      ) : conexiones.length === 0 ? (
+                        <div className="no-conexiones">No hay conexiones disponibles</div>
+                      ) : (
+                        conexiones.map((conexion, index) => (
+                          <div key={conexion.id_conn} className="conexion-item">
+                            <div className="conexion-header">
+                              <h4>Conexión #{index + 1}</h4>
+                              <span className="conexion-id">{conexion.id_conn}</span>
+                            </div>
+                            <div className="conexion-details">
+                              <p><strong>IP:</strong> {conexion.ip}</p>
+                              <p><strong>Puerto:</strong> {conexion.puerto}</p>
+                              <p><strong>Usuario:</strong> {conexion.usuario}</p>
+                              <p><strong>Contraseña:</strong> {conexion.clave}</p>
+                              {conexion.empresa_nombre && (
+                                <p><strong>Empresa:</strong> {conexion.empresa_nombre}</p>
+                              )}
+                              {conexion.aplicacion_nombre && (
+                                <p><strong>Aplicación:</strong> {conexion.aplicacion_nombre}</p>
+                              )}
+                              {conexion.modelo_nombre && (
+                                <p><strong>Modelo:</strong> {conexion.modelo_nombre}</p>
+                              )}
+                              {conexion.modelo_version && (
+                                <p><strong>Versión:</strong> {conexion.modelo_version}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    <div className="agregar-conexion">
+                      <form onSubmit={handleSubmitConexion} className="form-conexion">
+                        <div className="form-row">
+                          <div className="form-group">
+                            <label htmlFor="ip">Dirección IP:</label>
+                            <input
+                              type="text"
+                              id="ip"
+                              name="ip"
+                              value={formData.ip}
+                              onChange={handleInputChange}
+                              placeholder="192.168.1.100"
+                              required
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label htmlFor="port">Puerto:</label>
+                            <input
+                              type="number"
+                              id="port"
+                              name="port"
+                              value={formData.port}
+                              onChange={handleInputChange}
+                              placeholder="5432"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-group">
+                            <label htmlFor="user">Usuario:</label>
+                            <input
+                              type="text"
+                              id="user"
+                              name="user"
+                              value={formData.user}
+                              onChange={handleInputChange}
+                              placeholder="usuario_db"
+                              required
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label htmlFor="password">Contraseña:</label>
+                            <input
+                              type="password"
+                              id="password"
+                              name="password"
+                              value={formData.password}
+                              onChange={handleInputChange}
+                              placeholder="contraseña"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-group">
+                            <label htmlFor="company_id">Empresa:</label>
+                            <select
+                              id="company_id"
+                              name="company_id"
+                              value={formData.company_id}
+                              onChange={handleInputChange}
+                              required
+                            >
+                              <option value="">Seleccionar empresa</option>
+                              {empresas.map(empresa => (
+                                <option key={empresa.id} value={empresa.id}>
+                                  {empresa.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="form-group">
+                            <label htmlFor="app_id">Aplicación:</label>
+                            <select
+                              id="app_id"
+                              name="app_id"
+                              value={formData.app_id}
+                              onChange={handleInputChange}
+                              required
+                            >
+                              <option value="">Seleccionar aplicación</option>
+                              {aplicaciones.map(app => (
+                                <option key={app.id} value={app.id}>
+                                  {app.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-group">
+                            <label htmlFor="model_id">Modelo:</label>
+                            <select
+                              id="model_id"
+                              name="model_id"
+                              value={formData.model_id}
+                              onChange={handleInputChange}
+                              required
+                            >
+                              <option value="">Seleccionar modelo</option>
+                              {modelos.map(modelo => (
+                                <option key={modelo.id} value={modelo.id}>
+                                  {modelo.name} (v{modelo.version})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="form-buttons">
+                          <button type="submit" className="btn-submit">
+                            Crear Conexión
+                          </button>
+                          <button 
+                            type="button" 
+                            className="btn-cancel"
+                            onClick={() => setCurrentView("listar")}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Renderizar el componente
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<DataSageHome />);
+  </script>
+</body>
+</html>

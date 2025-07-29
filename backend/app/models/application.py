@@ -19,13 +19,13 @@ class Application(db.Model):
 
     # Métodos de ayuda
     def agregar_modelo(self, modelo):
-        self.modelos.append(modelo)
+        self.models.append(modelo)
 
     def obtener_modelo(self, modelo_id: str):
-        return next((m for m in self.modelos if m.id_model == modelo_id), None)
+        return next((m for m in self.models if m.id_model == modelo_id), None)
 
     def obtener_modelos(self) -> List:
-        return self.modelos
+        return self.models
 
     def agregar_conexion(self, conexion):
         self.conections.append(conexion)
