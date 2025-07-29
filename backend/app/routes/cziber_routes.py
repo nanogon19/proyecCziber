@@ -373,13 +373,6 @@ def consultar():
                 # db.session.add(query)
                 # db.session.commit()
 
-                #generar_pdf_tabla(df, ruta_salida=title_res)
-                #return send_file(
-                #    title_res,
-                #    mimetype="application/pdf",
-                #    download_name=title_res,  
-                #    as_attachment=False       
-                #)
                 return jsonify({
                     "columns": columns,
                     "data": data
@@ -390,4 +383,24 @@ def consultar():
         return jsonify({
             "error": str(e),
             "sql": sql_generado
+        }), 500
+
+@cziber_bp.route("/listar_aplicaciones", methods=["GET"])
+def listar_aplicaciones():
+    try:
+        engine = db.engine
+        with engine.connect() as conn:
+            resultado = conn.execute(text("SELECT * FROM applications"))
+            rows = resultado.fetchall()
+            columns = list(resultado.keys())
+            data = [list(row) for row in rows]
+
+            return jsonify({
+                "columns": columns,
+                "data": data
+            })
+
+    except Exception as e:
+        return jsonify({
+            "error": str(e)
         }), 500

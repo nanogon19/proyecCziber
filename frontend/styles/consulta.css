@@ -59,18 +59,24 @@ body {
 }
 
 .result-box {
-  max-height: 500px;
-  overflow-y: auto;
   padding: 10px;
   border: 1px solid #ccc;
   border-radius: 10px;
   background: #f8f8f8;
+  height: 500px;
+  width: 1200px;
+  scroll-behavior: smooth;
+  overflow-y: auto;
+  overflow-x: hidden;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .message {
   background-color: #e0e0e0;
   padding: 10px;
-  border-radius: 6px;
+  
   margin-bottom: 15px;
 }
 
@@ -78,6 +84,10 @@ body {
   background-color: #f4b142;
   color: white;
   text-align: right;
+  border-radius: 10px;
+  width: fit-content;
+  margin: 10px 0 15px auto;
+  padding: 7px;
 }
 
 .grid-response{
@@ -85,6 +95,7 @@ body {
   border-radius: 6px;
   padding: 10px;
   background-color: #f9f9f9;
+  height: 100%;
 }
 
 .input-area {
@@ -140,3 +151,44 @@ button:hover {
 .export-btn:hover {
   background-color: #e0a12c;
 }
+
+.conexiones{
+  color: #f4b142;
+  padding: 10px;
+  border-radius: 1px;
+  text-align: center;
+  cursor: pointer;
+  border-bottom: 2px solid #f4b142;
+  position: relative; 
+}
+
+.modal-conexiones {
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.5); /* fondo semi-transparente */
+  z-index: 9999;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.contenido-conexiones {
+  background-color: #ffffff;
+  border-radius: 10px;
+  padding: 20px;
+  color: black;
+  width: 400px;
+  max-width: 90%;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.conexiones:hover {
+  background-color: #f4b142;
+  color: white;
+}
+
