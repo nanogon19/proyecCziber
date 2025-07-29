@@ -2,7 +2,7 @@ from backend.app.extensions import db
 from backend.app.utils.security import EncryptionManager
 import uuid
 
-# encryptor = EncryptionManager()
+encryptor = EncryptionManager()
 
 class Conection(db.Model):
     __tablename__ = "conections"
@@ -23,27 +23,27 @@ class Conection(db.Model):
     model      = db.relationship("Model", back_populates="conections")
 
     # Constructor personalizado con cifrado
-    def __init__(self, ip, port, user, password, app_id, emp_id, model_id):
+    def __init__(self, ip, port, user, password, app_id, company_id, model_id):
         self.ip_enc = encryptor.encrypt_data(ip)
         self.port_enc = encryptor.encrypt_data(str(port))
         self.user_enc = encryptor.encrypt_data(user)
         self.password_enc = encryptor.encrypt_data(password)
         self.app_id = app_id
-        self.emp_id = emp_id
+        self.company_id = company_id
         self.model_id = model_id
 
     # Métodos de acceso a datos desencriptados
     def obtener_ip(self) -> str:
-        return encryptor.decrypt(self.ip_enc)
+        return encryptor.decrypt_data(self.ip_enc)
     
     def obtener_port(self) -> int:
-        return int(encryptor.decrypt(self.port_enc))
+        return int(encryptor.decrypt_data(self.port_enc))
 
     def obtener_usuario(self) -> str:
-        return encryptor.decrypt(self.user_enc)
+        return encryptor.decrypt_data(self.user_enc)
     
     def obtener_clave(self) -> str:
-        return encryptor.decrypt(self.password_enc)
+        return encryptor.decrypt_data(self.password_enc)
 
     def to_dict(self) -> dict:
         return {
@@ -53,6 +53,6 @@ class Conection(db.Model):
             "user": self.obtener_usuario(),
             "password": self.obtener_clave(),
             "app_id": self.app_id,
-            "emp_id": self.emp_id,
+            "company_id": self.company_id,
             "model_id": self.model_id
         }

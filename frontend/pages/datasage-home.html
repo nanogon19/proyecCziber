@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>DataSage</title>
+  <link rel="stylesheet" href="../styles/consulta.css">
+  <link href="https://unpkg.com/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
+  <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  
+  <!-- React y Babel -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root">
+    <div style="padding: 20px; text-align: center; background: #444; color: white; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+      <h2>Cargando DataSage...</h2>
+      <p>Si esta página no se carga completamente, revisa la consola del navegador (F12).</p>
+      <div style="margin-top: 20px;">
+        <div style="display: inline-block; width: 20px; height: 20px; background: #f4b142; border-radius: 50%; animation: bounce 1s infinite;"></div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @keyframes bounce {
+      0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0);
+      }
+      40% {
+        transform: translateY(-10px);
+      }
+      60% {
+        transform: translateY(-5px);
+      }
+    }
+  </style>
+
+  <!-- JSX embebido directamente -->
+  <script type="text/babel">
+    function DataSageHome() {
+      const [prompt, setPrompt] = React.useState("");
+      const [results, setResults] = React.useState([]);
+      const [showConexiones, setShowConexiones] = React.useState(false);
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!prompt.trim()) return;
+
+        try {
+          const response = await fetch('http://localhost:5000/cziber/consultar', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ prompt })
+          });
+
+          const json = await response.json();
+          console.log("Respuesta del servidor:", json);
+          
+          if (json.mensaje) {
+            alert(json.mensaje);
+            return;
+          }
+
+          alert('Consulta realizada correctamente. Funcionalidad completa en desarrollo.');
+          setPrompt("");
+
+        } catch (error) {
+          console.error("Error al enviar la consulta:", error);
+          alert("Error al enviar la consulta. Por favor, inténtelo de nuevo.");
+        }
+      };
+
+      return (
+        <div className="app-container">
+          <div className="sidebar">
+            <header>
+              <p 
+                className="conexiones" 
+                onClick={() => alert('Modal de conexiones en desarrollo')}
+                style={{ cursor: 'pointer' }}
+              >
+                Conexiones
+              </p>
+            </header>
+            <h2>Consultas anteriores</h2>
+            <div className="previous-queries">
+              <div className="query-item">
+                <div className="query-text">Ejemplo de consulta...</div>
+                <div className="query-time">Hace 5 minutos</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="main-container">
+            <header className="header">
+              <div className="logo">DATASAGE</div>
+              <img src="../static/img/logo.png" alt="Logo" className="logo-img" />
+            </header>
+
+            <div className="result-box" id="resultBox">
+              <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                <h3>¡Bienvenido a DataSage!</h3>
+                <p>Escribe tu consulta abajo para comenzar</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="input-area">
+              <textarea 
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Escriba su consulta aquí..."
+                rows="3"
+              />
+              <button type="submit" disabled={!prompt.trim()}>
+                Enviar
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    // Renderizar el componente después de que todo esté cargado
+    console.log('Intentando renderizar DataSageHome');
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<DataSageHome />);
+    console.log('DataSageHome renderizado');
+  </script>
+
+  <script>
+    // Log de verificación
+    console.log('Página cargada');
+    console.log('React disponible:', typeof React !== 'undefined');
+    console.log('ReactDOM disponible:', typeof ReactDOM !== 'undefined');
+    console.log('Babel disponible:', typeof Babel !== 'undefined');
+    console.log('GridJS disponible:', typeof gridjs !== 'undefined');
+    console.log('XLSX disponible:', typeof XLSX !== 'undefined');
+  </script>
+</body>
+</html>

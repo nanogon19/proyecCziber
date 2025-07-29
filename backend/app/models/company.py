@@ -28,6 +28,12 @@ class Company(db.Model):
     def agregar_aplicacion(self, app):
         self.application.append(app)
 
+    def agregar_modelo(self, modelo):
+        self.models.append(modelo)
+
+    def agregar_conexion(self, conexion):
+        self.conections.append(conexion)
+
     def obtener_empleados(self) -> List[str]:
         return [empleado.id_user for empleado in self.empleados]
     
