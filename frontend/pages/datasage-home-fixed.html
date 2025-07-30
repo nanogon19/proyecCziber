@@ -46,6 +46,7 @@
       const [showConexiones, setShowConexiones] = React.useState(false);
       const [conexiones, setConexiones] = React.useState([]);
       const [loading, setLoading] = React.useState(false);
+      const [queryLoading, setQueryLoading] = React.useState(false);
       const [currentView, setCurrentView] = React.useState("listar");
       const [formData, setFormData] = React.useState({
         ip: "",
@@ -75,13 +76,23 @@
           ],
           timestamp: new Date().toLocaleString()
         };
-        setResults(prev => [testResult, ...prev]);
+        setResults(prev => [...prev, testResult]);
       };
 
       const handleSubmit = async (e) => {
         e.preventDefault();
         if (!prompt.trim()) return;
 
+        setQueryLoading(true);
+        
+        // Scroll inmediato al mostrar el loading
+        setTimeout(() => {
+          const resultBox = document.getElementById('resultBox');
+          if (resultBox) {
+            resultBox.scrollTop = resultBox.scrollHeight;
+          }
+        }, 50);
+        
         try {
           const response = await fetch('http://localhost:5000/cziber/consultar', {
             method: 'POST',
@@ -96,6 +107,7 @@
           
           if (json.mensaje) {
             alert(json.mensaje);
+            setQueryLoading(false);
             return;
           }
 
@@ -110,12 +122,22 @@
             timestamp: new Date().toLocaleString()
           };
 
-          setResults(prev => [newResult, ...prev]);
+          setResults(prev => [...prev, newResult]);
           setPrompt("");
+
+          // Desplazarse automáticamente hacia abajo después de agregar la nueva respuesta
+          setTimeout(() => {
+            const resultBox = document.getElementById('resultBox');
+            if (resultBox) {
+              resultBox.scrollTop = resultBox.scrollHeight;
+            }
+          }, 100);
 
         } catch (error) {
           console.error("Error al enviar la consulta:", error);
           alert("Error al enviar la consulta. Por favor, inténtelo de nuevo.");
+        } finally {
+          setQueryLoading(false);
         }
       };
 
@@ -218,29 +240,37 @@
       const ResultBox = React.useMemo(() => {
         return (
           <div className="result-box" id="resultBox">
-            {memoizedResults.length === 0 ? (
+            {memoizedResults.length === 0 && !queryLoading ? (
               <div className="no-results">
                 <p>No hay consultas realizadas aún. Escribe una consulta para comenzar.</p>
               </div>
             ) : (
-              memoizedResults.map((result) => (
-                <div key={result.id} className="result-item">
-                  <div className="result-header">
-                    <h3>Consulta: {result.prompt}</h3>
-                    <button 
-                      className="export-btn"
-                      onClick={() => exportToExcel(result)}
-                    >
-                      Exportar a Excel
-                    </button>
+              <>
+                {memoizedResults.map((result) => (
+                  <div key={result.id} className="result-item">
+                    <div className="result-header">
+                      <h3>Consulta: {result.prompt}</h3>
+                      <button 
+                        className="export-btn"
+                        onClick={() => exportToExcel(result)}
+                      >
+                        Exportar a Excel
+                      </button>
+                    </div>
+                    <DataGrid columns={result.columns} data={result.data} />
                   </div>
-                  <DataGrid columns={result.columns} data={result.data} />
-                </div>
-              ))
+                ))}
+                {queryLoading && (
+                  <div className="loading-query">
+                    <div className="loading-spinner"></div>
+                    <p>Procesando consulta...</p>
+                  </div>
+                )}
+              </>
             )}
           </div>
         );
-      }, [memoizedResults, exportToExcel]);
+      }, [memoizedResults, exportToExcel, queryLoading]);
 
       const listarConexiones = async () => {
         setLoading(true);
@@ -393,9 +423,13 @@
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Escriba su consulta aquí..."
                 rows="3"
+                disabled={queryLoading}
               />
-              <button type="submit" disabled={!prompt.trim()}>
-                Enviar
+              <button 
+                type="submit" 
+                disabled={!prompt.trim() || queryLoading}
+              >
+                {queryLoading ? "Procesando..." : "Enviar"}
               </button>
             </form>
           </div>
