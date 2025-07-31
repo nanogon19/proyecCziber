@@ -51,15 +51,23 @@
       const [formData, setFormData] = React.useState({
         ip: "",
         port: "",
-        user: "",
-        password: "",
+        database_name: "",
         app_id: "",
         company_id: "",
         model_id: ""
       });
+      const [tempConnectionData, setTempConnectionData] = React.useState(null); // Datos temporales antes del login
       const [empresas, setEmpresas] = React.useState([]);
       const [aplicaciones, setAplicaciones] = React.useState([]);
       const [modelos, setModelos] = React.useState([]);
+      const [showLoginModal, setShowLoginModal] = React.useState(false);
+      const [showCreateConnectionModal, setShowCreateConnectionModal] = React.useState(false); // Nuevo modal para credenciales
+      const [selectedConnection, setSelectedConnection] = React.useState(null);
+      const [loginData, setLoginData] = React.useState({
+        username: "",
+        password: ""
+      });
+      const [currentConnectionString, setCurrentConnectionString] = React.useState("");
 
       // Agregar datos de prueba para testing
       const addTestData = () => {
@@ -79,9 +87,78 @@
         setResults(prev => [...prev, testResult]);
       };
 
+      const loadConexiones = async () => {
+        try {
+          const response = await fetch('http://localhost:5000/cziber/listar_todas_conexiones');
+          const data = await response.json();
+          setConexiones(data.conexiones || []);
+        } catch (error) {
+          console.error("Error al cargar conexiones:", error);
+          alert("Error al cargar las conexiones disponibles");
+        }
+      };
+
+      const handleSelectConnection = (conexion) => {
+        setSelectedConnection(conexion);
+        setShowConexiones(false);
+        setShowLoginModal(true);
+      };
+
+      const handleLogin = async (e) => {
+        e.preventDefault();
+        if (!selectedConnection || !loginData.username || !loginData.password) {
+          alert("Complete todos los campos");
+          return;
+        }
+
+        try {
+          const response = await fetch('http://localhost:5000/cziber/login_conexion', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              conexion_id: selectedConnection.id_conn,
+              username: loginData.username,
+              password: loginData.password
+            })
+          });
+
+          const result = await response.json();
+          
+          if (result.error) {
+            alert(result.error);
+            return;
+          }
+
+          if (result.connection_string) {
+            setCurrentConnectionString(result.connection_string);
+            setShowLoginModal(false);
+            setLoginData({ username: '', password: '' });
+            alert(`Conectado exitosamente a ${selectedConnection.ip}:${selectedConnection.port}/${selectedConnection.database}`);
+          }
+
+        } catch (error) {
+          console.error("Error al conectar:", error);
+          alert("Error al intentar conectar a la base de datos");
+        }
+      };
+
+      // Cargar conexiones al iniciar
+      React.useEffect(() => {
+        loadConexiones();
+      }, []);
+
       const handleSubmit = async (e) => {
         e.preventDefault();
         if (!prompt.trim()) return;
+
+        // Verificar si hay una conexión activa
+        if (!currentConnectionString && !selectedConnection) {
+          alert("Debe seleccionar y conectarse a una base de datos primero");
+          setShowConexiones(true);
+          return;
+        }
 
         setQueryLoading(true);
         
@@ -94,12 +171,25 @@
         }, 50);
         
         try {
+          const requestBody = {
+            prompt: prompt
+          };
+
+          // Si tenemos connection_string, usarlo; si no, usar conexion_id + credenciales
+          if (currentConnectionString) {
+            requestBody.connection_string = currentConnectionString;
+          } else if (selectedConnection && loginData.username && loginData.password) {
+            requestBody.conexion_id = selectedConnection.id_conn;
+            requestBody.username = loginData.username;
+            requestBody.password = loginData.password;
+          }
+
           const response = await fetch('http://localhost:5000/cziber/consultar', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ prompt })
+            body: JSON.stringify(requestBody)
           });
 
           const json = await response.json();
@@ -300,11 +390,18 @@
 
       const cargarDatosFormulario = async () => {
         try {
+          console.log("Cargando datos del formulario...");
+          
           // Cargar empresas
           const empResponse = await fetch("http://localhost:5000/cziber/listar_empresas_dropdown");
           if (empResponse.ok) {
             const empData = await empResponse.json();
             setEmpresas(empData.empresas);
+            console.log("Empresas cargadas:", empData.empresas);
+          } else {
+            console.error("Error al cargar empresas:", empResponse.status);
+            // Si falla, crear datos de prueba manualmente
+            await crearDatosPrueba();
           }
 
           // Cargar aplicaciones
@@ -312,6 +409,9 @@
           if (appResponse.ok) {
             const appData = await appResponse.json();
             setAplicaciones(appData.aplicaciones);
+            console.log("Aplicaciones cargadas:", appData.aplicaciones);
+          } else {
+            console.error("Error al cargar aplicaciones:", appResponse.status);
           }
 
           // Cargar modelos
@@ -319,36 +419,99 @@
           if (modelResponse.ok) {
             const modelData = await modelResponse.json();
             setModelos(modelData.modelos);
+            console.log("Modelos cargados:", modelData.modelos);
+          } else {
+            console.error("Error al cargar modelos:", modelResponse.status);
           }
         } catch (error) {
           console.error("Error cargando datos del formulario:", error);
         }
       };
 
+      // Función para crear datos de prueba
+      const crearDatosPrueba = async () => {
+        try {
+          console.log("Intentando crear datos de prueba...");
+          
+          const response = await fetch("http://localhost:5000/cziber/crear_datos_prueba", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            }
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            console.log("Datos de prueba creados:", result);
+          } else {
+            console.log("Error creando datos de prueba:", response.status);
+          }
+        } catch (error) {
+          console.log("Error conectando para crear datos de prueba:", error);
+        }
+      };
+
       const handleSubmitConexion = async (e) => {
         e.preventDefault();
         
+        // Validar que todos los campos estén completos
+        const requiredFields = ['ip', 'port', 'database_name', 'app_id', 'company_id', 'model_id'];
+        for (const field of requiredFields) {
+          if (!formData[field]) {
+            alert(`Por favor complete el campo: ${field}`);
+            return;
+          }
+        }
+        
+        // Guardar datos temporalmente y abrir modal de credenciales
+        setTempConnectionData(formData);
+        setShowCreateConnectionModal(true);
+        setLoginData({ username: '', password: '' });
+      };
+
+      // Nueva función para crear la conexión con credenciales
+      const handleCreateConnectionWithCredentials = async (e) => {
+        e.preventDefault();
+        
+        if (!tempConnectionData || !loginData.username || !loginData.password) {
+          alert("Complete todos los campos incluyendo usuario y contraseña");
+          return;
+        }
+
         try {
+          // Combinar datos de conexión con credenciales
+          const connectionDataWithCredentials = {
+            ...tempConnectionData,
+            username: loginData.username,
+            password: loginData.password
+          };
+
           const response = await fetch("http://localhost:5000/cziber/agregar_conexion", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify(formData)
+            body: JSON.stringify(connectionDataWithCredentials)
           });
 
           if (response.ok) {
             const data = await response.json();
             alert("Conexión creada exitosamente!");
+            
+            // Limpiar formularios y cerrar modales
             setFormData({
               ip: "",
               port: "",
-              user: "",
-              password: "",
+              database_name: "",
               app_id: "",
               company_id: "",
               model_id: ""
             });
+            setTempConnectionData(null);
+            setLoginData({ username: '', password: '' });
+            setShowCreateConnectionModal(false);
+            setCurrentView("listar");
+            
             // Actualizar la lista de conexiones
             listarConexiones();
           } else {
@@ -475,32 +638,48 @@
                       ) : conexiones.length === 0 ? (
                         <div className="no-conexiones">No hay conexiones disponibles</div>
                       ) : (
-                        conexiones.map((conexion, index) => (
-                          <div key={conexion.id_conn} className="conexion-item">
-                            <div className="conexion-header">
-                              <h4>Conexión #{index + 1}</h4>
-                              <span className="conexion-id">{conexion.id_conn}</span>
+                        <>
+                          <p style={{ marginBottom: '15px', color: '#666' }}>
+                            Selecciona una conexión para conectarte:
+                          </p>
+                          {conexiones.map((conexion, index) => (
+                            <div 
+                              key={conexion.id_conn} 
+                              className="conexion-item selectable"
+                              onClick={() => handleSelectConnection(conexion)}
+                              style={{
+                                cursor: 'pointer',
+                                border: selectedConnection?.id_conn === conexion.id_conn ? '2px solid #007bff' : '1px solid #ddd',
+                                backgroundColor: selectedConnection?.id_conn === conexion.id_conn ? '#f0f8ff' : 'white'
+                              }}
+                            >
+                              <div className="conexion-header">
+                                <h4>{conexion.nombre || `Conexión #${index + 1}`}</h4>
+                                <span className="conexion-id">{conexion.id_conn}</span>
+                              </div>
+                              <div className="conexion-details">
+                                <p><strong>IP:</strong> {conexion.ip}</p>
+                                <p><strong>Puerto:</strong> {conexion.puerto || conexion.port}</p>
+                                <p><strong>Base de Datos:</strong> {conexion.database}</p>
+                                {conexion.empresa_nombre && (
+                                  <p><strong>Empresa:</strong> {conexion.empresa_nombre}</p>
+                                )}
+                                {conexion.aplicacion_nombre && (
+                                  <p><strong>Aplicación:</strong> {conexion.aplicacion_nombre}</p>
+                                )}
+                                {conexion.modelo_nombre && (
+                                  <p><strong>Modelo:</strong> {conexion.modelo_nombre}</p>
+                                )}
+                                {conexion.modelo_version && (
+                                  <p><strong>Versión:</strong> {conexion.modelo_version}</p>
+                                )}
+                              </div>
+                              <div style={{ marginTop: '10px', fontSize: '12px', color: '#007bff' }}>
+                                Clic para seleccionar esta conexión
+                              </div>
                             </div>
-                            <div className="conexion-details">
-                              <p><strong>IP:</strong> {conexion.ip}</p>
-                              <p><strong>Puerto:</strong> {conexion.puerto}</p>
-                              <p><strong>Usuario:</strong> {conexion.usuario}</p>
-                              <p><strong>Contraseña:</strong> {conexion.clave}</p>
-                              {conexion.empresa_nombre && (
-                                <p><strong>Empresa:</strong> {conexion.empresa_nombre}</p>
-                              )}
-                              {conexion.aplicacion_nombre && (
-                                <p><strong>Aplicación:</strong> {conexion.aplicacion_nombre}</p>
-                              )}
-                              {conexion.modelo_nombre && (
-                                <p><strong>Modelo:</strong> {conexion.modelo_nombre}</p>
-                              )}
-                              {conexion.modelo_version && (
-                                <p><strong>Versión:</strong> {conexion.modelo_version}</p>
-                              )}
-                            </div>
-                          </div>
-                        ))
+                          ))}
+                        </>
                       )}
                     </div>
                   ) : (
@@ -535,26 +714,14 @@
 
                         <div className="form-row">
                           <div className="form-group">
-                            <label htmlFor="user">Usuario:</label>
+                            <label htmlFor="database_name">Nombre de Base de Datos:</label>
                             <input
                               type="text"
-                              id="user"
-                              name="user"
-                              value={formData.user}
+                              id="database_name"
+                              name="database_name"
+                              value={formData.database_name}
                               onChange={handleInputChange}
-                              placeholder="usuario_db"
-                              required
-                            />
-                          </div>
-                          <div className="form-group">
-                            <label htmlFor="password">Contraseña:</label>
-                            <input
-                              type="password"
-                              id="password"
-                              name="password"
-                              value={formData.password}
-                              onChange={handleInputChange}
-                              placeholder="contraseña"
+                              placeholder="nombre_database"
                               required
                             />
                           </div>
@@ -619,7 +786,7 @@
 
                         <div className="form-buttons">
                           <button type="submit" className="btn-submit">
-                            Crear Conexión
+                            Continuar con Credenciales
                           </button>
                           <button 
                             type="button" 
@@ -633,6 +800,138 @@
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal de Login para conexión existente */}
+          {showLoginModal && selectedConnection && (
+            <div className="modal-conexiones">
+              <div className="contenido-conexiones" style={{ maxWidth: '400px' }}>
+                <span 
+                  className="cerrar"
+                  onClick={() => {
+                    setShowLoginModal(false);
+                    setSelectedConnection(null);
+                    setLoginData({ username: '', password: '' });
+                  }}
+                >
+                  &times;
+                </span>
+                <h2>Conectar a Base de Datos</h2>
+                
+                <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
+                  <p><strong>Conexión:</strong> {selectedConnection.nombre || 'Sin nombre'}</p>
+                  <p><strong>Servidor:</strong> {selectedConnection.ip}:{selectedConnection.puerto || selectedConnection.port}</p>
+                  <p><strong>Base de Datos:</strong> {selectedConnection.database}</p>
+                </div>
+                
+                <form onSubmit={handleLogin} className="form-conexion">
+                  <div className="form-group">
+                    <label>Usuario de Base de Datos:</label>
+                    <input
+                      type="text"
+                      value={loginData.username}
+                      onChange={(e) => setLoginData(prev => ({ ...prev, username: e.target.value }))}
+                      placeholder="Ingrese su usuario"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Contraseña:</label>
+                    <input
+                      type="password"
+                      value={loginData.password}
+                      onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                      placeholder="Ingrese su contraseña"
+                      required
+                    />
+                  </div>
+                  <div className="form-buttons">
+                    <button type="submit" className="btn-submit">
+                      Conectar
+                    </button>
+                    <button 
+                      type="button" 
+                      className="btn-cancel"
+                      onClick={() => {
+                        setShowLoginModal(false);
+                        setSelectedConnection(null);
+                        setLoginData({ username: '', password: '' });
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Modal de credenciales para nueva conexión */}
+          {showCreateConnectionModal && tempConnectionData && (
+            <div className="modal-conexiones">
+              <div className="contenido-conexiones" style={{ maxWidth: '450px' }}>
+                <span 
+                  className="cerrar"
+                  onClick={() => {
+                    setShowCreateConnectionModal(false);
+                    setTempConnectionData(null);
+                    setLoginData({ username: '', password: '' });
+                  }}
+                >
+                  &times;
+                </span>
+                <h2>Credenciales de Base de Datos</h2>
+                
+                <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
+                  <p><strong>Nueva Conexión:</strong></p>
+                  <p><strong>Servidor:</strong> {tempConnectionData.ip}:{tempConnectionData.port}</p>
+                  <p><strong>Base de Datos:</strong> {tempConnectionData.database_name}</p>
+                </div>
+                
+                <p style={{ marginBottom: '15px', color: '#666', fontSize: '14px' }}>
+                  Para completar la creación de la conexión, proporcione las credenciales de acceso a la base de datos:
+                </p>
+                
+                <form onSubmit={handleCreateConnectionWithCredentials} className="form-conexion">
+                  <div className="form-group">
+                    <label>Usuario de Base de Datos:</label>
+                    <input
+                      type="text"
+                      value={loginData.username}
+                      onChange={(e) => setLoginData(prev => ({ ...prev, username: e.target.value }))}
+                      placeholder="Ingrese usuario de la base de datos"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Contraseña:</label>
+                    <input
+                      type="password"
+                      value={loginData.password}
+                      onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                      placeholder="Ingrese contraseña de la base de datos"
+                      required
+                    />
+                  </div>
+                  <div className="form-buttons">
+                    <button type="submit" className="btn-submit">
+                      Crear Conexión
+                    </button>
+                    <button 
+                      type="button" 
+                      className="btn-cancel"
+                      onClick={() => {
+                        setShowCreateConnectionModal(false);
+                        setTempConnectionData(null);
+                        setLoginData({ username: '', password: '' });
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           )}
