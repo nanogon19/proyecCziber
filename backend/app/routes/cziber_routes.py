@@ -21,7 +21,6 @@ from backend.app.models.query import Query
 
 cziber_bp = Blueprint("cziber", __name__)
 
-
 @cziber_bp.route("/registrar_empresa", methods=["POST"])
 def registrar_empresa():
     data = request.json
@@ -140,11 +139,12 @@ def registrar_conexion():
     puerto = data.get("puerto")
     usuario = data.get("usuario")
     clave = data.get("clave")
+    database_name = data.get("database_name")
     emp_id = data.get("emp_id")
     app_id = data.get("app_id")
     model_id = data.get("model_id")
 
-    if not all([ip, puerto, usuario, clave, emp_id, app_id, model_id]):
+    if not all([ip, puerto, usuario, clave, database_name, emp_id, app_id, model_id]):
         return jsonify({"error": "Missing required fields"}), 400
     
     emp = Company.query.get(emp_id)
@@ -165,6 +165,7 @@ def registrar_conexion():
         port=puerto,
         user=usuario,
         password=clave,
+        database_name=database_name,
         app_id=app_id,
         company_id=emp_id,
         model_id=model_id
@@ -227,12 +228,11 @@ def listar_conexiones():
             "puerto": con.obtener_port(),
             "usuario": con.obtener_usuario(),
             "clave": con.obtener_clave(),
+            "database": con.obtener_database(),
             "modelo_id": con.model_id,
             "app_id": con.app_id,
             "company_id": con.company_id
-        }
-        
-        # Agregar información del modelo si existe
+        }        # Agregar información del modelo si existe
         if modelo:
             conexion_data["modelo_nombre"] = modelo.nombre
             conexion_data["modelo_version"] = modelo.version
@@ -266,6 +266,7 @@ def listar_todas_conexiones():
                 "puerto": con.obtener_port(),
                 "usuario": con.obtener_usuario(),
                 "clave": con.obtener_clave(),
+                "database": con.obtener_database(),
                 "modelo_id": con.model_id,
                 "app_id": con.app_id,
                 "company_id": con.company_id
@@ -290,6 +291,37 @@ def listar_todas_conexiones():
             "conexiones": conexiones_serializadas,
             "total": len(conexiones_serializadas)
         }), 200
+        
+    except Exception as e:
+        return jsonify({"error": f"Error al obtener conexiones: {str(e)}"}), 500
+
+@cziber_bp.route("/conexiones", methods=["GET"])
+def obtener_conexiones():
+    """
+    Endpoint simple para obtener todas las conexiones (usado por frontend)
+    """
+    try:
+        conexiones = Conection.query.all()
+        
+        conexiones_serializadas = []
+        for con in conexiones:
+            try:
+                # Obtener información básica sin decryptar
+                conexion_data = {
+                    "id_conn": con.id_conn,
+                    "ip": con.obtener_ip(),
+                    "port": con.obtener_port(),
+                    "database": con.obtener_database() if hasattr(con, 'obtener_database') else 'N/A',
+                    "nombre": f"Conexión {con.id_conn}"
+                }
+                
+                conexiones_serializadas.append(conexion_data)
+                
+            except Exception as inner_e:
+                print(f"Error procesando conexión {con.id_conn}: {str(inner_e)}")
+                continue
+        
+        return jsonify(conexiones_serializadas), 200
         
     except Exception as e:
         return jsonify({"error": f"Error al obtener conexiones: {str(e)}"}), 500
@@ -345,23 +377,114 @@ def generar_pdf_tabla(df, ruta_salida="resultado.pdf"):
     plt.savefig(ruta_salida, bbox_inches='tight')
     plt.close()
 
+@cziber_bp.route("/login_conexion", methods=["POST"])
+def login_conexion():
+    """
+    Login usando una conexión existente con credenciales de usuario
+    """
+    try:
+        data = request.json
+        
+        # Validar datos requeridos
+        required_fields = ["conexion_id", "username", "password"]
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"Campo requerido faltante: {field}"}), 400
+        
+        # Obtener la conexión
+        conexion = Conection.query.get(data["conexion_id"])
+        if not conexion:
+            return jsonify({"error": "Conexión no encontrada"}), 404
+        
+        # Construir connection string con credenciales del usuario
+        connection_string = (
+            f"mssql+pyodbc://{data['username']}:{data['password']}"
+            f"@{conexion.obtener_ip()},{conexion.obtener_port()}/{conexion.obtener_database()}"
+            "?driver=ODBC+Driver+18+for+SQL+Server"
+            "&TrustServerCertificate=yes"
+            "&Encrypt=no"
+        )
+        
+        # Imprimir connection_string para depuración
+        print(f"\n=== DEBUG LOGIN_CONEXION ===")
+        print(f"Conexión ID: {data['conexion_id']}")
+        print(f"Usuario: {data['username']}")
+        print(f"IP: {conexion.obtener_ip()}")
+        print(f"Puerto: {conexion.obtener_port()}")
+        print(f"Database: {conexion.obtener_database()}")
+        print(f"Connection String: {connection_string}")
+        print(f"=============================\n")
+        
+        # Probar la conexión
+        try:
+            test_engine = create_engine(connection_string, connect_args={"timeout": 5})
+            with test_engine.connect() as test_conn:
+                # Ejecutar una consulta simple para validar la conexión
+                result = test_conn.execute(text("SELECT 1"))
+                result.fetchone()
+            
+            # Si llegamos aquí, la conexión es exitosa
+            return jsonify({
+                "message": "Login exitoso",
+                "connection_string": connection_string,
+                "conexion_info": {
+                    "id": conexion.id_conn,
+                    "ip": conexion.obtener_ip(),
+                    "puerto": conexion.obtener_port(),
+                    "database": conexion.obtener_database()
+                }
+            }), 200
+            
+        except Exception as conn_error:
+            return jsonify({
+                "error": "Error de autenticación o conexión",
+                "details": str(conn_error)
+            }), 401
+        
+    except Exception as e:
+        return jsonify({"error": f"Error en login: {str(e)}"}), 500
+
 @cziber_bp.route("/consultar", methods=["POST"])
 def consultar():
+    data = request.get_json()
+    
+    # Validar que se proporcione connection_string o conexion_id + credenciales
+    if "connection_string" in data:
+        connection_string = data["connection_string"]
+        print(f"\n=== DEBUG CONSULTAR (usando connection_string) ===")
+        print(f"Connection String: {connection_string}")
+        print(f"===========================================\n")
+    elif all(field in data for field in ["conexion_id", "username", "password"]):
+        # Obtener la conexión
+        conexion = Conection.query.get(data["conexion_id"])
+        if not conexion:
+            return jsonify({"error": "Conexión no encontrada"}), 404
+        
+        # Construir connection string
+        connection_string = (
+            f"mssql+pyodbc://{data['username']}:{data['password']}"
+            f"@{conexion.obtener_ip()},{conexion.obtener_port()}/{conexion.obtener_database()}"
+            "?driver=ODBC+Driver+18+for+SQL+Server"
+            "&TrustServerCertificate=yes"
+            "&Encrypt=no"
+        )
+        print(f"\n=== DEBUG CONSULTAR (usando conexion_id + credenciales) ===")
+        print(f"Conexión ID: {data['conexion_id']}")
+        print(f"Connection String: {connection_string}")
+        print(f"=========================================================\n")
+    else:
+        # Error si no se proporcionan datos de conexión
+        return jsonify({
+            "error": "Se requiere connection_string o conexion_id + username + password para realizar la consulta"
+        }), 400
+
     engine = db.engine
-
-    connection_string = (
-        "mssql+pyodbc://igonzalez:Zig1-Red6{Voc1@192.168.0.5,1433/Gamma_CZ"
-        "?driver=ODBC+Driver+18+for+SQL+Server"
-        "&TrustServerCertificate=yes"
-        "&Encrypt=no"
-    )
     engine_consultas = create_engine(connection_string, connect_args={"timeout": 5})
-
 
     data = request.get_json()
     prompt_usuario = data["prompt"]
     esquema = obtener_esquema_ligero(prompt_usuario, engine)
-    ruta_documentacion = r"C:\Users\nanog\OneDrive\Desktop\Cziber\proySQL-IA\contexto"
+    ruta_documentacion = r"C:\Users\nanog\OneDrive\Desktop\proyectoCziber\contexto"
     contexto_pdf = extraer_texto_de_pdfs(ruta_documentacion)
 
     prompt_completo = f"""
@@ -370,7 +493,8 @@ def consultar():
     Base de datos:
     {esquema}
     Usuario dice: {prompt_usuario}
-    Si la consulta es válida, devuelve la consulta MS SQL completa, sin ninguna explicacion. No inventes relaciones ni tablas ni columnas que no existan.
+    Si la consulta es válida, devuelve la consulta MS SQL completa, sin ninguna explicacion. 
+    No inventes relaciones ni tablas ni columnas que no existan.
     En caso de que la consulta no sea válida, devuelve el siguiente mensaje de error: Consulta inválida, por favor intente nuevamente.
     """
 
@@ -393,31 +517,12 @@ def consultar():
             sql_generado = sql_generado[3:].strip()
     print(f"SQL Generada: {sql_generado}")
 
-    prompt_titulo = f"""
-    Basado en este pedido del usuario:
-    \"{prompt_usuario}\"
-    Genera un titulo descriptivo para el PDF de maximo 5 palabras.
-    """
-    response_title = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "Sos un asistente que genera nombres de archivos descriptivos."},
-            {"role": "user", "content": prompt_titulo}
-        ]
-    )
-
-    print("Tokens usados:", response.usage.total_tokens + response_title.usage.total_tokens)
-    print("Prompt tokens:", response.usage.prompt_tokens + response_title.usage.prompt_tokens)
-    print("Completion tokens:", response.usage.completion_tokens + response_title.usage.completion_tokens)
-
-    title_pdf = response_title.choices[0].message.content.strip()
-    title_pdf = re.sub(r'[\\/*?:<>|\"\'\n]', '', title_pdf)
-    title_pdf = title_pdf.replace(" ", "_")
-    title_pdf = title_pdf.lower()
-    title_res = f"{title_pdf}.pdf"
+    print("Tokens usados:", response.usage.total_tokens )
+    print("Prompt tokens:", response.usage.prompt_tokens )
+    print("Completion tokens:", response.usage.completion_tokens)
    
-    tokens_in  = response.usage.prompt_tokens + response_title.usage.prompt_tokens
-    tokens_out = response.usage.completion_tokens + response_title.usage.completion_tokens
+    tokens_in  = response.usage.prompt_tokens 
+    tokens_out = response.usage.completion_tokens 
 
     try:
         with engine_consultas.connect() as conn:
@@ -488,7 +593,7 @@ def agregar_conexion():
         data = request.json
         
         # Validar datos requeridos
-        required_fields = ["ip", "port", "user", "password", "app_id", "company_id", "model_id"]
+        required_fields = ["ip", "port", "database_name", "app_id", "company_id", "model_id", "username", "password"]
         for field in required_fields:
             if field not in data:
                 return jsonify({"error": f"Campo requerido faltante: {field}"}), 400
@@ -510,8 +615,9 @@ def agregar_conexion():
         nueva_conexion = Conection(
             ip=data["ip"],
             port=data["port"],
-            user=data["user"],
+            user=data["username"],
             password=data["password"],
+            database_name=data["database_name"],
             app_id=data["app_id"],
             company_id=data["company_id"],
             model_id=data["model_id"]
@@ -527,6 +633,9 @@ def agregar_conexion():
         
     except Exception as e:
         db.session.rollback()
+        print(f"Error detallado al crear conexión: {str(e)}")
+        print(f"Tipo de error: {type(e)}")
+        print(f"Datos recibidos: {data}")
         return jsonify({"error": f"Error al crear conexión: {str(e)}"}), 500
 
 @cziber_bp.route("/listar_empresas_dropdown", methods=["GET"])
@@ -564,3 +673,91 @@ def listar_modelos_dropdown():
         return jsonify({"modelos": modelos_list}), 200
     except Exception as e:
         return jsonify({"error": f"Error al obtener modelos: {str(e)}"}), 500
+
+@cziber_bp.route("/crear_datos_prueba", methods=["POST", "GET"])
+def crear_datos_prueba():
+    """
+    Crear datos de prueba para empresas, aplicaciones y modelos
+    """
+    try:
+        print("Intentando crear datos de prueba...")
+        datos_creados = []
+        
+        # Crear empresas si no existen
+        empresas_count = Company.query.count()
+        print(f"Empresas existentes: {empresas_count}")
+        
+        if empresas_count == 0:
+            print("Creando empresas de prueba...")
+            empresas_prueba = [
+                Company(name="Gamma Consultores"),
+                Company(name="Tech Solutions"),
+                Company(name="Data Analytics Inc")
+            ]
+            for empresa in empresas_prueba:
+                db.session.add(empresa)
+            datos_creados.append("empresas")
+        
+        # Crear aplicaciones si no existen
+        apps_count = Application.query.count()
+        print(f"Aplicaciones existentes: {apps_count}")
+        
+        if apps_count == 0:
+            print("Creando aplicaciones de prueba...")
+            apps_prueba = [
+                Application(nombre="DataSage"),
+                Application(nombre="Business Intelligence"),
+                Application(nombre="Customer Analytics")
+            ]
+            for app in apps_prueba:
+                db.session.add(app)
+            datos_creados.append("aplicaciones")
+        
+        # Hacer commit para empresas y aplicaciones
+        db.session.commit()
+        print("Commit realizado para empresas y aplicaciones")
+        
+        # Crear modelos si no existen
+        modelos_count = Model.query.count()
+        print(f"Modelos existentes: {modelos_count}")
+        
+        if modelos_count == 0:
+            print("Creando modelos de prueba...")
+            primera_app = Application.query.first()
+            if primera_app:
+                print(f"Primera aplicación encontrada: {primera_app.id_app}")
+                modelos_prueba = [
+                    Model(nombre="GPT-4", version="1.0", app_id=primera_app.id_app),
+                    Model(nombre="Claude", version="2.1", app_id=primera_app.id_app),
+                    Model(nombre="Llama", version="3.0", app_id=primera_app.id_app)
+                ]
+                for modelo in modelos_prueba:
+                    db.session.add(modelo)
+                datos_creados.append("modelos")
+            else:
+                print("No se encontró ninguna aplicación para asociar modelos")
+        
+        db.session.commit()
+        print("Commit final realizado")
+        
+        # Contar datos finales
+        resumen = {
+            "empresas": Company.query.count(),
+            "aplicaciones": Application.query.count(),
+            "modelos": Model.query.count(),
+            "datos_creados": datos_creados
+        }
+        
+        print(f"Resumen final: {resumen}")
+        
+        return jsonify({
+            "mensaje": "Datos de prueba creados exitosamente",
+            "resumen": resumen
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error creando datos de prueba: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Error creando datos de prueba: {str(e)}"}), 500
