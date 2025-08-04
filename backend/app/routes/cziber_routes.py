@@ -468,35 +468,23 @@ def consultar():
             "&TrustServerCertificate=yes"
             "&Encrypt=no"
         )
-        
-        print(f"\n=== DEBUG CONSULTAR (construyendo connection_string) ===")
+        print(f"\n=== DEBUG CONSULTAR (usando conexion_id + credenciales) ===")
         print(f"Conexión ID: {data['conexion_id']}")
-        print(f"Usuario: {data['username']}")
-        print(f"IP: {conexion.obtener_ip()}")
-        print(f"Puerto: {conexion.obtener_port()}")
-        print(f"Database: {conexion.obtener_database()}")
         print(f"Connection String: {connection_string}")
-        print(f"===================================================\n")
+        print(f"=========================================================\n")
     else:
-        # Usar conexión por defecto (mantener compatibilidad)
-        connection_string = (
-            "mssql+pyodbc://igonzalez:Zig1-Red6{Voc1@192.168.0.5,1433/Gamma_CZ"
-            "?driver=ODBC+Driver+18+for+SQL+Server"
-            "&TrustServerCertificate=yes"
-            "&Encrypt=no"
-        )
-        print(f"\n=== DEBUG CONSULTAR (usando conexión por defecto) ===")
-        print(f"Connection String: {connection_string}")
-        print(f"====================================================\n")
+        # Error si no se proporcionan datos de conexión
+        return jsonify({
+            "error": "Se requiere connection_string o conexion_id + username + password para realizar la consulta"
+        }), 400
 
     engine = db.engine
     engine_consultas = create_engine(connection_string, connect_args={"timeout": 5})
 
-
     data = request.get_json()
     prompt_usuario = data["prompt"]
     esquema = obtener_esquema_ligero(prompt_usuario, engine)
-    ruta_documentacion = r"C:\Users\nanog\OneDrive\Desktop\Cziber\proySQL-IA\contexto"
+    ruta_documentacion = r"C:\Users\nanog\OneDrive\Desktop\proyectoCziber\contexto"
     contexto_pdf = extraer_texto_de_pdfs(ruta_documentacion)
 
     prompt_completo = f"""
@@ -505,7 +493,8 @@ def consultar():
     Base de datos:
     {esquema}
     Usuario dice: {prompt_usuario}
-    Si la consulta es válida, devuelve la consulta MS SQL completa, sin ninguna explicacion. No inventes relaciones ni tablas ni columnas que no existan.
+    Si la consulta es válida, devuelve la consulta MS SQL completa, sin ninguna explicacion. 
+    No inventes relaciones ni tablas ni columnas que no existan.
     En caso de que la consulta no sea válida, devuelve el siguiente mensaje de error: Consulta inválida, por favor intente nuevamente.
     """
 
@@ -528,31 +517,12 @@ def consultar():
             sql_generado = sql_generado[3:].strip()
     print(f"SQL Generada: {sql_generado}")
 
-    prompt_titulo = f"""
-    Basado en este pedido del usuario:
-    \"{prompt_usuario}\"
-    Genera un titulo descriptivo para el PDF de maximo 5 palabras.
-    """
-    response_title = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "Sos un asistente que genera nombres de archivos descriptivos."},
-            {"role": "user", "content": prompt_titulo}
-        ]
-    )
-
-    print("Tokens usados:", response.usage.total_tokens + response_title.usage.total_tokens)
-    print("Prompt tokens:", response.usage.prompt_tokens + response_title.usage.prompt_tokens)
-    print("Completion tokens:", response.usage.completion_tokens + response_title.usage.completion_tokens)
-
-    title_pdf = response_title.choices[0].message.content.strip()
-    title_pdf = re.sub(r'[\\/*?:<>|\"\'\n]', '', title_pdf)
-    title_pdf = title_pdf.replace(" ", "_")
-    title_pdf = title_pdf.lower()
-    title_res = f"{title_pdf}.pdf"
+    print("Tokens usados:", response.usage.total_tokens )
+    print("Prompt tokens:", response.usage.prompt_tokens )
+    print("Completion tokens:", response.usage.completion_tokens)
    
-    tokens_in  = response.usage.prompt_tokens + response_title.usage.prompt_tokens
-    tokens_out = response.usage.completion_tokens + response_title.usage.completion_tokens
+    tokens_in  = response.usage.prompt_tokens 
+    tokens_out = response.usage.completion_tokens 
 
     try:
         with engine_consultas.connect() as conn:
