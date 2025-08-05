@@ -2,6 +2,11 @@ from backend.app import create_app
 from backend.app.extensions import db
 from flask_migrate import Migrate
 from backend.app.models import User, Company, Application, Model, Query
+import os
+from dotenv import load_dotenv
+
+# Cargar variables de entorno
+load_dotenv()
 
 app = create_app()
 migrate = Migrate(app, db)
@@ -57,13 +62,53 @@ def make_shell_context():
         "db": db,
         "User": User,
         "Company": Company,
-        "Aplication": Application,
+        "Application": Application,
         "Model": Model,
         "Query": Query
     }
 
-if __name__ == "__main__":
+def run_server():
+    """Función para ejecutar el servidor desde línea de comandos"""
+    print("🚀 Iniciando DataSage...")
+    print("📊 Sistema de análisis de datos con IA")
+    print("🌐 Servidor disponible en: http://localhost:5000")
+    print("✨ ¡Listo para consultas inteligentes!")
+    
     # Crear datos de prueba al iniciar
     crear_datos_prueba()
-    app.run(debug=True)
+    
+    # Configurar puerto desde variable de entorno o usar 5000 por defecto
+    port = int(os.environ.get('PORT', 5000))
+    
+    app.run(
+        host='0.0.0.0',
+        port=port,
+        debug=os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
+    )
+
+def main():
+    """Función principal para el punto de entrada del paquete"""
+    import sys
+    
+    if len(sys.argv) > 1:
+        command = sys.argv[1]
+        if command == 'server':
+            run_server()
+        elif command == 'init-db':
+            with app.app_context():
+                db.create_all()
+                crear_datos_prueba()
+                print("✅ Base de datos inicializada")
+        elif command == 'shell':
+            with app.app_context():
+                import IPython
+                IPython.embed()
+        else:
+            print(f"Comando desconocido: {command}")
+            print("Comandos disponibles: server, init-db, shell")
+    else:
+        run_server()
+
+if __name__ == "__main__":
+    main()
 
