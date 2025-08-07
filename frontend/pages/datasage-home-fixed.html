@@ -51,15 +51,9 @@
       const [formData, setFormData] = React.useState({
         ip: "",
         port: "",
-        database_name: "",
-        app_id: "",
-        company_id: "",
-        model_id: ""
+        database_name: ""
       });
       const [tempConnectionData, setTempConnectionData] = React.useState(null); // Datos temporales antes del login
-      const [empresas, setEmpresas] = React.useState([]);
-      const [aplicaciones, setAplicaciones] = React.useState([]);
-      const [modelos, setModelos] = React.useState([]);
       const [showLoginModal, setShowLoginModal] = React.useState(false);
       const [showCreateConnectionModal, setShowCreateConnectionModal] = React.useState(false); // Nuevo modal para credenciales
       const [selectedConnection, setSelectedConnection] = React.useState(null);
@@ -388,74 +382,11 @@
         setLoading(false);
       };
 
-      const cargarDatosFormulario = async () => {
-        try {
-          console.log("Cargando datos del formulario...");
-          
-          // Cargar empresas
-          const empResponse = await fetch("http://localhost:5000/cziber/listar_empresas_dropdown");
-          if (empResponse.ok) {
-            const empData = await empResponse.json();
-            setEmpresas(empData.empresas);
-            console.log("Empresas cargadas:", empData.empresas);
-          } else {
-            console.error("Error al cargar empresas:", empResponse.status);
-            // Si falla, crear datos de prueba manualmente
-            await crearDatosPrueba();
-          }
-
-          // Cargar aplicaciones
-          const appResponse = await fetch("http://localhost:5000/cziber/listar_aplicaciones_dropdown");
-          if (appResponse.ok) {
-            const appData = await appResponse.json();
-            setAplicaciones(appData.aplicaciones);
-            console.log("Aplicaciones cargadas:", appData.aplicaciones);
-          } else {
-            console.error("Error al cargar aplicaciones:", appResponse.status);
-          }
-
-          // Cargar modelos
-          const modelResponse = await fetch("http://localhost:5000/cziber/listar_modelos_dropdown");
-          if (modelResponse.ok) {
-            const modelData = await modelResponse.json();
-            setModelos(modelData.modelos);
-            console.log("Modelos cargados:", modelData.modelos);
-          } else {
-            console.error("Error al cargar modelos:", modelResponse.status);
-          }
-        } catch (error) {
-          console.error("Error cargando datos del formulario:", error);
-        }
-      };
-
-      // Función para crear datos de prueba
-      const crearDatosPrueba = async () => {
-        try {
-          console.log("Intentando crear datos de prueba...");
-          
-          const response = await fetch("http://localhost:5000/cziber/crear_datos_prueba", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            }
-          });
-          
-          if (response.ok) {
-            const result = await response.json();
-            console.log("Datos de prueba creados:", result);
-          } else {
-            console.log("Error creando datos de prueba:", response.status);
-          }
-        } catch (error) {
-          console.log("Error conectando para crear datos de prueba:", error);
-        }
-      };
-
       const handleSubmitConexion = async (e) => {
         e.preventDefault();
         
         // Validar que todos los campos estén completos
-        const requiredFields = ['ip', 'port', 'database_name', 'app_id', 'company_id', 'model_id'];
+        const requiredFields = ['ip', 'port', 'database_name'];
         for (const field of requiredFields) {
           if (!formData[field]) {
             alert(`Por favor complete el campo: ${field}`);
@@ -496,16 +427,23 @@
 
           if (response.ok) {
             const data = await response.json();
-            alert("Conexión creada exitosamente!");
+            let successMessage = "Conexión creada exitosamente!";
+            
+            // Mostrar valores por defecto usados si están disponibles
+            if (data.defaults_used) {
+              successMessage += `\n\nValores asignados automáticamente:`;
+              successMessage += `\n• Empresa: ${data.defaults_used.empresa}`;
+              successMessage += `\n• Aplicación: ${data.defaults_used.aplicacion}`;
+              successMessage += `\n• Modelo: ${data.defaults_used.modelo}`;
+            }
+            
+            alert(successMessage);
             
             // Limpiar formularios y cerrar modales
             setFormData({
               ip: "",
               port: "",
-              database_name: "",
-              app_id: "",
-              company_id: "",
-              model_id: ""
+              database_name: ""
             });
             setTempConnectionData(null);
             setLoginData({ username: '', password: '' });
@@ -623,7 +561,6 @@
                     className={`conexion-op ${currentView === 'agregar' ? 'active' : ''}`}
                     onClick={() => {
                       setCurrentView("agregar");
-                      cargarDatosFormulario();
                     }}
                   >
                     Agregar conexión
@@ -684,6 +621,11 @@
                     </div>
                   ) : (
                     <div className="agregar-conexion">
+                      <h3>Agregar Nueva Conexión</h3>
+                      <p style={{ marginBottom: '15px', color: '#666', fontSize: '14px' }}>
+                        ℹ️ La empresa, aplicación y modelo se asignarán automáticamente usando los primeros registros disponibles en el sistema.
+                      </p>
+                      
                       <form onSubmit={handleSubmitConexion} className="form-conexion">
                         <div className="form-row">
                           <div className="form-group">
@@ -724,63 +666,6 @@
                               placeholder="nombre_database"
                               required
                             />
-                          </div>
-                        </div>
-
-                        <div className="form-row">
-                          <div className="form-group">
-                            <label htmlFor="company_id">Empresa:</label>
-                            <select
-                              id="company_id"
-                              name="company_id"
-                              value={formData.company_id}
-                              onChange={handleInputChange}
-                              required
-                            >
-                              <option value="">Seleccionar empresa</option>
-                              {empresas.map(empresa => (
-                                <option key={empresa.id} value={empresa.id}>
-                                  {empresa.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="form-group">
-                            <label htmlFor="app_id">Aplicación:</label>
-                            <select
-                              id="app_id"
-                              name="app_id"
-                              value={formData.app_id}
-                              onChange={handleInputChange}
-                              required
-                            >
-                              <option value="">Seleccionar aplicación</option>
-                              {aplicaciones.map(app => (
-                                <option key={app.id} value={app.id}>
-                                  {app.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="form-row">
-                          <div className="form-group">
-                            <label htmlFor="model_id">Modelo:</label>
-                            <select
-                              id="model_id"
-                              name="model_id"
-                              value={formData.model_id}
-                              onChange={handleInputChange}
-                              required
-                            >
-                              <option value="">Seleccionar modelo</option>
-                              {modelos.map(modelo => (
-                                <option key={modelo.id} value={modelo.id}>
-                                  {modelo.name} (v{modelo.version})
-                                </option>
-                              ))}
-                            </select>
                           </div>
                         </div>
 
