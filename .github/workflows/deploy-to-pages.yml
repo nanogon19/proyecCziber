@@ -43,11 +43,6 @@ jobs:
         run: npm run build
         working-directory: frontend
 
-      # (SPA) Copia index.html a 404.html para rutas client-side
-      - name: SPA 404 fallback
-        run: cp frontend/dist/index.html frontend/dist/404.html
-        working-directory: frontend
-
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
