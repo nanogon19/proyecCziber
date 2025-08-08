@@ -6,6 +6,13 @@ services:
     plan: free
     buildCommand: |
       pip install -r requirements.txt
+      cd proyectocziber
+      npm ci
+      npm run build
+      cd ..
+      # Copiar el frontend HTML como fallback
+      mkdir -p backend/static/legacy
+      cp -r frontend/* backend/static/legacy/
     startCommand: gunicorn run:app
     envVars:
       - key: DATABASE_URL

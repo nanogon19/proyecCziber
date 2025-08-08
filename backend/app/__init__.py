@@ -30,6 +30,9 @@ def create_app():
             "http://localhost:5500",
             "http://localhost:5000",
             "http://127.0.0.1:5000",
+            "http://localhost:3000",  # Vite dev server
+            "https://datasage-web.onrender.com",  # Render deployment
+            "https://*.onrender.com",  # Cualquier subdominio de Render
         ],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization"],
@@ -44,10 +47,27 @@ def create_app():
     # Rutas de API
     register_routes(app)
 
+    # --- Rutas para el frontend HTML (fallback) ---
+    @app.route("/legacy")
+    @app.route("/legacy/<path:path>")
+    def legacy_frontend(path="index.html"):
+        legacy_dir = Path(app.static_folder).parent / "static" / "legacy"
+        if path == "index.html" or path == "":
+            path = "pages/datasage-home-fixed.html"
+        
+        requested = legacy_dir / path
+        if requested.exists():
+            return send_from_directory(str(legacy_dir), path)
+        return send_from_directory(str(legacy_dir / "pages"), "datasage-home-fixed.html")
+
     # --- SPA catch-all ---
     @app.route("/", defaults={"path": ""})
     @app.route("/<path:path>")
     def spa(path):
+        # Evitar conflictos con rutas de API
+        if path.startswith(("auth/", "user/", "cziber/", "company/", "legacy/")):
+            return {"error": "API route not found"}, 404
+            
         requested = Path(app.static_folder) / path
         if path and requested.exists():
             return send_from_directory(app.static_folder, path)
