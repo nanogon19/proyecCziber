@@ -35,23 +35,24 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Navigate to frontend folder
-        run: cd  frontend
-
       - name: Install deps
         run: npm ci
+        working-directory: frontend
 
       - name: Build
         run: npm run build
+        working-directory: frontend
 
       # (SPA) Copia index.html a 404.html para rutas client-side
       - name: SPA 404 fallback
         run: cp dist/index.html dist/404.html
+        working-directory: frontend
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: frontend/dist
+        
 
   deploy:
     environment:
