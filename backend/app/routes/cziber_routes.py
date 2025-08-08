@@ -381,11 +381,9 @@ def login_conexion():
         
         # Construir connection string con credenciales del usuario
         connection_string = (
-            f"mssql+pyodbc://{data['username']}:{data['password']}"
-            f"@{conexion.obtener_ip()},{conexion.obtener_port()}/{conexion.obtener_database()}"
-            "?driver=ODBC+Driver+18+for+SQL+Server"
-            "&TrustServerCertificate=yes"
-            "&Encrypt=no"
+            f"mssql+pytds://{data['username']}:{data['password']}"
+            f"@{conexion.obtener_ip()}:{conexion.obtener_port()}/{conexion.obtener_database()}?"
+            "use_tls=true&autocommit=true"
         )
         
         # Imprimir connection_string para depuración
@@ -445,12 +443,10 @@ def consultar():
         
         # Construir connection string
         connection_string = (
-            f"mssql+pyodbc://{data['username']}:{data['password']}"
-            f"@{conexion.obtener_ip()},{conexion.obtener_port()}/{conexion.obtener_database()}"
-            "?driver=ODBC+Driver+18+for+SQL+Server"
-            "&TrustServerCertificate=yes"
-            "&Encrypt=no"
-        )
+            f"mssql+pytds://{data['username']}:{data['password']}"
+            f"@{conexion.obtener_ip()}:{conexion.obtener_port()}/{conexion.obtener_database()}?"
+            "use_tls=true&autocommit=true"
+            )
         print(f"\n=== DEBUG CONSULTAR (usando conexion_id + credenciales) ===")
         print(f"Conexión ID: {data['conexion_id']}")
         print(f"Connection String: {connection_string}")
