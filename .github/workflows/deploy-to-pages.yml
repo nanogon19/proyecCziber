@@ -45,7 +45,7 @@ jobs:
 
       # (SPA) Copia index.html a 404.html para rutas client-side
       - name: SPA 404 fallback
-        run: cp dist/index.html dist/404.html
+        run: cp frontend/dist/index.html frontend/dist/404.html
         working-directory: frontend
 
       - name: Upload artifact
