@@ -1,4 +1,4 @@
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, jsonify
 from flask_cors import CORS
 from pathlib import Path
 from dotenv import load_dotenv
@@ -12,76 +12,33 @@ from .routes import register_routes
 load_dotenv()  # carga .env (incluye DATABASE_URL)
 
 def create_app():
-    # Ruta a 'dist' (Vite)
-    DIST_DIR = Path(__file__).resolve().parents[2] / "proyectoCziber" / "dist"
-
-    app = Flask(
-        __name__,
-        static_folder=str(DIST_DIR),
-        static_url_path=""
-    )
+    # Crear app Flask básica
+    app = Flask(__name__)
     app.config.from_object(Config)
 
-    # --- CORS (ajustá dominios cuando tengas prod) ---
-    CORS(
-        app,
-        origins=[
-            "http://127.0.0.1:5500",
-            "http://localhost:5500",
-            "http://localhost:5000",
-            "http://127.0.0.1:5000",
-            "http://localhost:3000",  # Vite dev server
-            "https://datasage-web.onrender.com",  # Render deployment
-            "https://*.onrender.com",  # Cualquier subdominio de Render
-        ],
-        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization"],
-    )
+    # --- CORS simple ---
+    CORS(app, origins=["*"])  # Permitir todo por ahora para debugging
+
+    # --- Ruta de prueba básica ---
+    @app.route("/")
+    def home():
+        return {"message": "Flask server is running!", "status": "OK"}
+
+    @app.route("/health")
+    def health():
+        return {"status": "healthy", "app": "datasage"}
 
     # --- DB & Migrations ---
-    # Requiere que DATABASE_URL esté en .env con formato:
-    # postgresql+psycopg2://USER:PASSWORD@HOST/DB?sslmode=require
-    db.init_app(app)
-    migrate.init_app(app, db)
+    try:
+        db.init_app(app)
+        migrate.init_app(app, db)
+    except Exception as e:
+        print(f"Warning: Database initialization failed: {e}")
 
     # Rutas de API
-    register_routes(app)
-
-    # --- Rutas para el frontend HTML (fallback) ---
-    @app.route("/legacy")
-    @app.route("/legacy/<path:path>")
-    def legacy_frontend(path="index.html"):
-        legacy_dir = Path(app.static_folder).parent / "static" / "legacy"
-        if path == "index.html" or path == "":
-            path = "pages/datasage-home-fixed.html"
-        
-        requested = legacy_dir / path
-        if requested.exists():
-            return send_from_directory(str(legacy_dir), path)
-        return send_from_directory(str(legacy_dir / "pages"), "datasage-home-fixed.html")
-
-    # --- SPA catch-all ---
-    @app.route("/", defaults={"path": ""})
-    @app.route("/<path:path>")
-    def spa(path):
-        # Evitar conflictos con rutas de API
-        if path.startswith(("auth/", "user/", "cziber/", "company/", "legacy/")):
-            return {"error": "API route not found"}, 404
-            
-        requested = Path(app.static_folder) / path
-        if path and requested.exists():
-            return send_from_directory(app.static_folder, path)
-        return send_from_directory(app.static_folder, "index.html")
-
-    # (Opcional) Comprobación de conexión a DB al arranque
-    # Útil mientras configurás Neon; podés borrar esto luego.
-    if app.config.get("SQLALCHEMY_DATABASE_URI"):
-        from sqlalchemy import text
-        with app.app_context():
-            try:
-                db.session.execute(text("SELECT 1"))
-                # print("✅ Conexión a DB OK")
-            except Exception as e:
-                print(f"⚠️ Error conectando a la DB: {e}")
+    try:
+        register_routes(app)
+    except Exception as e:
+        print(f"Warning: Routes registration failed: {e}")
 
     return app
