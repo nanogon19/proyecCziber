@@ -1,7 +1,6 @@
 import os
 import re
 import fitz
-import panda as pd
 import matplotlib.pyplot as plt
 
 from backend.app.models.query import Query

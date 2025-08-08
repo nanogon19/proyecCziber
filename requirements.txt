@@ -15,7 +15,6 @@ PyMuPDF==1.24.7
 matplotlib==3.8.4
 
 # Evitar compilación: wheels para py3.11
-pandas==2.2.2
 numpy==1.26.4
 
 # MSSQL (pyodbc compila OK; el driver ODBC de MS se instala a nivel SO aparte)

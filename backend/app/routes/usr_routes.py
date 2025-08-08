@@ -6,7 +6,6 @@ import os
 import openai
 from openai import OpenAI
 import matplotlib.pyplot as plt
-import pandas as pd
 import re
 from sqlalchemy import inspect, text
 import fitz  # PyMuPDF for PDF text extraction
