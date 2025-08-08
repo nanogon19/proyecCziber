@@ -1,14 +1,25 @@
-Flask==3.0.2
-Flask-Cors==4.0.0
-Flask-Migrate==4.0.5
+Flask==3.0.3
+Flask-Cors==4.0.1
+Flask-Migrate==4.0.7
 Flask-SQLAlchemy==3.1.1
-SQLAlchemy==2.0.29
-alembic==1.13.1
-python-dotenv==1.0.1
+SQLAlchemy==2.0.30
 psycopg2-binary==2.9.9
-openai==1.35.10
-matplotlib==3.8.4
+python-dotenv==1.0.1
+gunicorn==21.2.0
+
+# OpenAI SDK (si lo usás)
+openai==1.40.2
+
+# PDF y gráficos
 PyMuPDF==1.24.7
+matplotlib==3.8.4
+
+# Evitar compilación: wheels para py3.11
 pandas==2.2.2
 numpy==1.26.4
-gunicorn==21.2.0
+
+# MSSQL (pyodbc compila OK; el driver ODBC de MS se instala a nivel SO aparte)
+pyodbc==5.1.0
+
+# Cripto para algo de encriptación si lo usás
+cryptography==42.0.8
