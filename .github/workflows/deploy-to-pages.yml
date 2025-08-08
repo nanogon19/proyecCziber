@@ -8,6 +8,10 @@ on:
         type: choice
         required: true
         default: deploy
+        options:
+          - main
+          - deploy
+        
 
 permissions:
   contents: read
