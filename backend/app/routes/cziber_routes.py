@@ -7,7 +7,6 @@ from openai import OpenAI
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')  # Evita problemas con el backend de matplotlib en servidores sin GUI
-import pandas as pd
 import re
 from sqlalchemy import inspect, text, create_engine
 import fitz
@@ -361,22 +360,6 @@ def extraer_texto_de_pdfs(directorio):
             texto_total += "\n\n"
     return texto_total.strip()
 
-def generar_pdf_tabla(df, ruta_salida="resultado.pdf"):
-    fig, ax = plt.subplots(figsize=(len(df.columns) * 1.5, len(df) * 0.5 + 1))
-    ax.axis('tight')
-    ax.axis('off')
-    tabla = ax.table(
-        cellText=df.values,
-        colLabels=df.columns,
-        loc='center',
-        cellLoc='center'
-    )
-    tabla.auto_set_font_size(False)
-    tabla.set_fontsize(8)
-    tabla.scale(1.2, 1.2)
-    plt.savefig(ruta_salida, bbox_inches='tight')
-    plt.close()
-
 @cziber_bp.route("/login_conexion", methods=["POST"])
 def login_conexion():
     """
@@ -398,11 +381,9 @@ def login_conexion():
         
         # Construir connection string con credenciales del usuario
         connection_string = (
-            f"mssql+pyodbc://{data['username']}:{data['password']}"
-            f"@{conexion.obtener_ip()},{conexion.obtener_port()}/{conexion.obtener_database()}"
-            "?driver=ODBC+Driver+18+for+SQL+Server"
-            "&TrustServerCertificate=yes"
-            "&Encrypt=no"
+            f"mssql+pytds://{data['username']}:{data['password']}"
+            f"@{conexion.obtener_ip()}:{conexion.obtener_port()}/{conexion.obtener_database()}?"
+            "use_tls=true&autocommit=true"
         )
         
         # Imprimir connection_string para depuración
@@ -462,12 +443,10 @@ def consultar():
         
         # Construir connection string
         connection_string = (
-            f"mssql+pyodbc://{data['username']}:{data['password']}"
-            f"@{conexion.obtener_ip()},{conexion.obtener_port()}/{conexion.obtener_database()}"
-            "?driver=ODBC+Driver+18+for+SQL+Server"
-            "&TrustServerCertificate=yes"
-            "&Encrypt=no"
-        )
+            f"mssql+pytds://{data['username']}:{data['password']}"
+            f"@{conexion.obtener_ip()}:{conexion.obtener_port()}/{conexion.obtener_database()}?"
+            "use_tls=true&autocommit=true"
+            )
         print(f"\n=== DEBUG CONSULTAR (usando conexion_id + credenciales) ===")
         print(f"Conexión ID: {data['conexion_id']}")
         print(f"Connection String: {connection_string}")
