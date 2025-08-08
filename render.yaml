@@ -6,13 +6,11 @@ services:
     plan: free
     buildCommand: |
       pip install -r requirements.txt
-      cd proyectoCziber
-      npm ci
-      npm run build
-      cd ..
     startCommand: gunicorn run:app
     envVars:
       - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
         sync: false
       - key: SECRET_KEY
         generateValue: true
