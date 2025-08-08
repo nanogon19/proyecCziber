@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: datasage-web
+    runtime: python
+    region: oregon # o sa-east-1 si te aparece, Render suele rotar regiones
+    plan: free
+    buildCommand: |
+      pip install -r requirements.txt
+      cd proyectoCziber
+      npm ci
+      npm run build
+      cd ..
+    startCommand: gunicorn run:app
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: ENC_KEY
+        generateValue: true
+      - key: FLASK_ENV
+        value: production
