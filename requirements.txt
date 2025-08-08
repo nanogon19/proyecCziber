@@ -1,23 +1,14 @@
-# --- Core web ---
-Flask==3.0.3
-Flask-Cors==4.0.1
+Flask==3.0.2
+Flask-Cors==4.0.0
+Flask-Migrate==4.0.5
 Flask-SQLAlchemy==3.1.1
-Flask-Migrate==4.0.7
-gunicorn==22.0.0
-
-# --- ORM / DB drivers ---
-SQLAlchemy==2.0.32
-psycopg2-binary==2.9.9     # Postgres (Neon)
-pyodbc==5.1.0              # SQL Server vía ODBC (mssql+pyodbc)
-
-# --- Utils / Config ---
+SQLAlchemy==2.0.29
+alembic==1.13.1
 python-dotenv==1.0.1
-requests==2.32.3
-
-# --- AI ---
-openai>=1.40.0,<2          # usás `from openai import OpenAI`
-
-# --- Data / PDFs / gráficos ---
-pandas==2.2.2
+psycopg2-binary==2.9.9
+openai==1.35.10
 matplotlib==3.8.4
-PyMuPDF==1.24.9            # paquete se llama "PyMuPDF" (import fitz)
+PyMuPDF==1.24.7
+pandas==2.2.2
+numpy==1.26.4
+gunicorn==21.2.0
