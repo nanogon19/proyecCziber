@@ -33,8 +33,8 @@ type Resultado = {
   timestamp: string;
 };
 
-// ✅ Usamos rutas relativas para evitar CORS
-const api = (path: string) => path;
+const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || '';
+const api = (path: string) => `${API}${path.startsWith('/') ? '' : '/'}${path}`;
 
 /** Grid de resultados (gridjs) */
 const DataGrid = memo(function DataGrid({
