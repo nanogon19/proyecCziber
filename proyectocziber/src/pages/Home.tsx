@@ -33,7 +33,7 @@ type Resultado = {
   timestamp: string;
 };
 
-const API = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || '';
+const API = 'https://datasage-k86t.onrender.com';
 const api = (path: string) => `${API}${path.startsWith('/') ? '' : '/'}${path}`;
 
 /** Grid de resultados (gridjs) */
