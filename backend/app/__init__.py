@@ -14,13 +14,13 @@ def create_app():
 
     # --- CORS: permitir solo tu front en GitHub Pages ---
     CORS(
-        app,
-        resources={r"/cziber/*": {
-            "origins": ["https://nanogon19.github.io"],
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"]
-        }},
-    )
+    app,
+    resources={r"/*": {  # <- TODAS las rutas, incluye /health y /cziber/*
+        "origins": ["https://nanogon19.github.io"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }},
+)
 
     # --- Ruta de prueba ---
     @app.route("/")
