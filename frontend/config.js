@@ -42,18 +42,43 @@ async function apiCall(endpoint, options = {}) {
     ...options
   };
   
-  console.log(`API Call: ${url}`);
+  console.log(`🔗 API Call: ${url}`);
+  console.log('📤 Request options:', defaultOptions);
   
   try {
     const response = await fetch(url, defaultOptions);
     
+    console.log(`📥 Response status: ${response.status} ${response.statusText}`);
+    
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      // Intentar leer el cuerpo de la respuesta para más detalles del error
+      const errorText = await response.text();
+      console.error('❌ Error response body:', errorText);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     
-    return await response.json();
+    // Verificar que la respuesta sea JSON válido
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const responseText = await response.text();
+      console.error('⚠️ Response is not JSON:', responseText.substring(0, 200));
+      throw new Error('Server returned non-JSON response');
+    }
+    
+    const data = await response.json();
+    console.log('✅ Success response:', data);
+    return data;
+    
   } catch (error) {
-    console.error(`Error calling ${url}:`, error);
+    console.error(`❌ Error calling ${url}:`, error);
+    
+    // Mostrar un mensaje más amigable al usuario
+    if (error.message.includes('Failed to fetch')) {
+      throw new Error('No se puede conectar al servidor. Verifica tu conexión a internet.');
+    } else if (error.message.includes('Server returned non-JSON')) {
+      throw new Error('El servidor devolvió una respuesta inválida. Puede estar temporalmente fuera de servicio.');
+    }
+    
     throw error;
   }
 }
