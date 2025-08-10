@@ -16,8 +16,17 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # --- CORS simple ---
-    CORS(app, origins=["*"])  # Permitir todo por ahora para debugging
+    # --- CORS configurado para GitHub Pages y desarrollo local ---
+    CORS(app, origins=[
+        "http://localhost:5500",
+        "http://127.0.0.1:5500", 
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
+        "http://localhost:3000",  # Vite dev server
+        "https://nanogon19.github.io",  # Tu GitHub Pages
+        "https://datasage-k86t.onrender.com",  # Tu backend en Render
+        "*"  # Temporalmente permitir todo para debugging
+    ])
 
     # --- Ruta de prueba básica ---
     @app.route("/")

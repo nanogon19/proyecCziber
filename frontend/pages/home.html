@@ -6,12 +6,18 @@
   <link rel="stylesheet" href="../styles/consulta.css">
   <link href="https://unpkg.com/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
   <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflar      const listarConexiones = async () => {
+        setLoading(true);
+        try {
+          const data = await apiCall(CONFIG.ENDPOINTS.LISTAR_CONEXIONES);libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   
   <!-- React y Babel -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Configuración del backend -->
+  <script src="../config.js"></script>
 </head>
 <body>
   <div id="root">
@@ -83,8 +89,7 @@
 
       const loadConexiones = async () => {
         try {
-          const response = await fetch('http://localhost:5000/cziber/listar_todas_conexiones');
-          const data = await response.json();
+          const data = await apiCall(CONFIG.ENDPOINTS.LISTAR_CONEXIONES);
           setConexiones(data.conexiones || []);
         } catch (error) {
           console.error("Error al cargar conexiones:", error);
@@ -106,19 +111,14 @@
         }
 
         try {
-          const response = await fetch('http://localhost:5000/cziber/login_conexion', {
+          const result = await apiCall(CONFIG.ENDPOINTS.LOGIN_CONEXION, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
             body: JSON.stringify({
               conexion_id: selectedConnection.id_conn,
               username: loginData.username,
               password: loginData.password
             })
           });
-
-          const result = await response.json();
           
           if (result.error) {
             alert(result.error);
@@ -178,15 +178,10 @@
             requestBody.password = loginData.password;
           }
 
-          const response = await fetch('http://localhost:5000/cziber/consultar', {
+          const json = await apiCall(CONFIG.ENDPOINTS.CONSULTAR, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
             body: JSON.stringify(requestBody)
           });
-
-          const json = await response.json();
           console.log("Respuesta del servidor:", json);
           
           if (json.mensaje) {
@@ -417,20 +412,16 @@
             password: loginData.password
           };
 
-          const response = await fetch("http://localhost:5000/cziber/agregar_conexion", {
+          const response = await apiCall(CONFIG.ENDPOINTS.AGREGAR_CONEXION, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
             body: JSON.stringify(connectionDataWithCredentials)
           });
 
-          if (response.ok) {
-            const data = await response.json();
+          if (response) {
             let successMessage = "Conexión creada exitosamente!";
             
             // Mostrar valores por defecto usados si están disponibles
-            if (data.defaults_used) {
+            if (response.defaults_used) {
               successMessage += `\n\nValores asignados automáticamente:`;
               successMessage += `\n• Empresa: ${data.defaults_used.empresa}`;
               successMessage += `\n• Aplicación: ${data.defaults_used.aplicacion}`;
