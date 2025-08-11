@@ -384,7 +384,13 @@ def login_conexion():
             f"mssql+pyobdc://{data['username']}:{data['password']}"
             f"@{conexion.obtener_ip()}:{conexion.obtener_port()}/{conexion.obtener_database()}?"
             "use_tls=true&autocommit=true"
-        )
+        ).format(
+            user=data["username"],
+            pwd=data["password"],
+            host=conexion.obtener_ip(),
+            port=conexion.obtener_port(),
+            db=conexion.obtener_database(),
+    )
         
         # Imprimir connection_string para depuración
         print(f"\n=== DEBUG LOGIN_CONEXION ===")
@@ -446,6 +452,12 @@ def consultar():
             f"mssql+pyobdc://{data['username']}:{data['password']}"
             f"@{conexion.obtener_ip()}:{conexion.obtener_port()}/{conexion.obtener_database()}?"
             "use_tls=true&autocommit=true"
+            ).format(
+                user=data["username"],
+                pwd=data["password"],
+                host=conexion.obtener_ip(),
+                port=conexion.obtener_port(),
+                db=conexion.obtener_database(),
             )
         print(f"\n=== DEBUG CONSULTAR (usando conexion_id + credenciales) ===")
         print(f"Conexión ID: {data['conexion_id']}")
