@@ -381,7 +381,7 @@ def login_conexion():
         
         # Construir connection string con credenciales del usuario
         connection_string = (
-            f"mssql+pytds://{data['username']}:{data['password']}"
+            f"mssql+pyobdc://{data['username']}:{data['password']}"
             f"@{conexion.obtener_ip()}:{conexion.obtener_port()}/{conexion.obtener_database()}?"
             "use_tls=true&autocommit=true"
         )
@@ -443,7 +443,7 @@ def consultar():
         
         # Construir connection string
         connection_string = (
-            f"mssql+pytds://{data['username']}:{data['password']}"
+            f"mssql+pyobdc://{data['username']}:{data['password']}"
             f"@{conexion.obtener_ip()}:{conexion.obtener_port()}/{conexion.obtener_database()}?"
             "use_tls=true&autocommit=true"
             )

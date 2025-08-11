@@ -33,7 +33,7 @@ type Resultado = {
   timestamp: string;
 };
 
-const API = 'https://mean-divided-arrested-publicly.trycloudflare.com';
+const API = 'https://seeing-professor-card-behaviour.trycloudflare.com/';
 const api = (path: string) => `${API}${path.startsWith('/') ? '' : '/'}${path}`;
 
 /** Grid de resultados (gridjs) */
