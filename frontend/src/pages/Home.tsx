@@ -33,7 +33,7 @@ type Resultado = {
   timestamp: string;
 };
 
-const API = 'https://datasage-k86t.onrender.com';
+const API = 'https://mean-divided-arrested-publicly.trycloudflare.com/';
 const api = (path: string) => `${API}${path.startsWith('/') ? '' : '/'}${path}`;
 
 /** Grid de resultados (gridjs) */

@@ -37,16 +37,16 @@ jobs:
 
       - name: Install deps
         run: npm i
-        working-directory: proyectocziber
+        working-directory: frontend
 
       - name: Build
         run: npm run build
-        working-directory: proyectocziber
+        working-directory: frontend
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: proyectocziber/dist
+          path: frontend/dist
         
 
   deploy:
