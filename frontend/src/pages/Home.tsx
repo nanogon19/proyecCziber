@@ -33,10 +33,9 @@ type Resultado = {
   timestamp: string;
 };
 
-const API = 'https://croatia-pursue-abstracts-whale.trycloudflare.com';
+const API = 'https://fabric-professional-assistant-traveling.trycloudflare.com/';
 const api = (path: string) => `${API}${path.startsWith('/') ? '' : '/'}${path}`;
 
-/** Grid de resultados (gridjs) */
 const DataGrid = memo(function DataGrid({
   columns,
   data,

@@ -381,16 +381,15 @@ def login_conexion():
         
         # Construir connection string con credenciales del usuario
         connection_string = (
-            f"mssql+pyobdc://{data['username']}:{data['password']}"
-            f"@{conexion.obtener_ip()}:{conexion.obtener_port()}/{conexion.obtener_database()}?"
-            "use_tls=true&autocommit=true"
-        ).format(
-            user=data["username"],
-            pwd=data["password"],
-            host=conexion.obtener_ip(),
-            port=conexion.obtener_port(),
-            db=conexion.obtener_database(),
-    )
+                "mssql+pyodbc://{user}:{pwd}@{host}:{port}/{db}?"
+                "use_tls=true&autocommit=true"
+            ).format(
+                user=data["username"],
+                pwd=data["password"],
+                host=conexion.obtener_ip(),
+                port=conexion.obtener_port(),
+                db=conexion.obtener_database(),
+            )
         
         # Imprimir connection_string para depuración
         print(f"\n=== DEBUG LOGIN_CONEXION ===")
