@@ -3,10 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <title>DataSage</title>
-  <link rel="stylesheet" href="/proyecCziber/styles/consulta.css">
+  <link rel="stylesheet" href="../styles/consulta.css">
   <link href="https://unpkg.com/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
   <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflar      const listarConexiones = async () => {
+        setLoading(true);
+        try {
+          const data = await apiCall(CONFIG.ENDPOINTS.LISTAR_CONEXIONES);libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   
   <!-- React y Babel -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -14,7 +17,7 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   
   <!-- Configuración del backend -->
-  <script src="/proyecCziber/config.js"></script>
+  <script src="../config.js"></script>
 </head>
 <body>
   <div id="root">
