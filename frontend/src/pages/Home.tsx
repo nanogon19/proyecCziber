@@ -33,7 +33,7 @@ type Resultado = {
   timestamp: string;
 };
 
-const API = 'https://fabric-professional-assistant-traveling.trycloudflare.com';
+const API = 'https://platinum-colour-instructor-buf.trycloudflare.com';
 const api = (path: string) => `${API}${path.startsWith('/') ? '' : '/'}${path}`;
 
 const DataGrid = memo(function DataGrid({

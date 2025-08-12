@@ -10,6 +10,8 @@ matplotlib.use('Agg')  # Evita problemas con el backend de matplotlib en servido
 import re
 from sqlalchemy import inspect, text, create_engine
 import fitz
+from urllib.parse import quote_plus
+import pyodbc
 from backend.app.extensions import db
 
 from backend.app.models.application import Application
@@ -374,45 +376,41 @@ def login_conexion():
             if field not in data:
                 return jsonify({"error": f"Campo requerido faltante: {field}"}), 400
         
-        # Obtener la conexión
+        # Obtener la conexión guardada
         conexion = Conection.query.get(data["conexion_id"])
         if not conexion:
             return jsonify({"error": "Conexión no encontrada"}), 404
         
-        # Construir connection string con credenciales del usuario
+        # Cadena de conexión usando pyodbc (ODBC Driver 18)
         connection_string = (
-                "mssql+pyodbc://{user}:{pwd}@{host}:{port}/{db}?"
-                "use_tls=true&autocommit=true"
-            ).format(
-                user=data["username"],
-                pwd=data["password"],
-                host=conexion.obtener_ip(),
-                port=conexion.obtener_port(),
-                db=conexion.obtener_database(),
-            )
+            "DRIVER={ODBC Driver 18 for SQL Server};"
+            f"SERVER={conexion.obtener_ip()},{conexion.obtener_port()};"
+            f"DATABASE={conexion.obtener_database()};"
+            f"UID={data['username']};"
+            f"PWD={data['password']};"
+            "Encrypt=no;"
+            "TrustServerCertificate=yes;"
+        )
         
-        # Imprimir connection_string para depuración
-        print(f"\n=== DEBUG LOGIN_CONEXION ===")
-        print(f"Conexión ID: {data['conexion_id']}")
-        print(f"Usuario: {data['username']}")
+        # Debug
+        print("\n=== DEBUG LOGIN_CONEXION ===")
         print(f"IP: {conexion.obtener_ip()}")
         print(f"Puerto: {conexion.obtener_port()}")
         print(f"Database: {conexion.obtener_database()}")
+        print(f"Usuario: {data['username']}")
         print(f"Connection String: {connection_string}")
-        print(f"=============================\n")
+        print("=============================\n")
         
-        # Probar la conexión
+        # Probar conexión
         try:
-            test_engine = create_engine(connection_string, connect_args={"timeout": 5})
-            with test_engine.connect() as test_conn:
-                # Ejecutar una consulta simple para validar la conexión
-                result = test_conn.execute(text("SELECT 1"))
-                result.fetchone()
+            cn = pyodbc.connect(connection_string, timeout=5)
+            cursor = cn.cursor()
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+            cn.close()
             
-            # Si llegamos aquí, la conexión es exitosa
             return jsonify({
                 "message": "Login exitoso",
-                "connection_string": connection_string,
                 "conexion_info": {
                     "id": conexion.id_conn,
                     "ip": conexion.obtener_ip(),
@@ -420,7 +418,7 @@ def login_conexion():
                     "database": conexion.obtener_database()
                 }
             }), 200
-            
+        
         except Exception as conn_error:
             return jsonify({
                 "error": "Error de autenticación o conexión",
@@ -430,50 +428,69 @@ def login_conexion():
     except Exception as e:
         return jsonify({"error": f"Error en login: {str(e)}"}), 500
 
+def _build_pyodbc_sqlalchemy_url(ip: str, port: int, database: str, user: str, pwd: str) -> str:
+    """
+    Devuelve una URL SQLAlchemy correcta usando pyodbc + odbc_connect.
+    IMPORTANTE:
+      - Si usás puerto fijo: SERVER=ip,puerto (coma)
+      - Si usás instancia nombrada: usar SERVER=r"ip\\INSTANCIA" y no poner puerto.
+      - Ajustá el Driver a 17 si es el que tenés instalado.
+    """
+    driver = "ODBC Driver 18 for SQL Server"  # o "ODBC Driver 17 for SQL Server"
+    # Por defecto, asumimos puerto fijo:
+    server = f"{ip},{port}"
+    # Si en tu modelo guardás instancia y NO usás puerto, podés hacer:
+    # server = rf"{ip}\{instancia}"
+
+    odbc_str = (
+        f"DRIVER={{{driver}}};"
+        f"SERVER={server};"
+        f"DATABASE={database};"
+        f"UID={user};PWD={pwd};"
+        "Encrypt=yes;"
+        "TrustServerCertificate=yes;"
+        "Timeout=5;"
+    )
+    return f"mssql+pyodbc:///?odbc_connect={quote_plus(odbc_str)}"
+
+
 @cziber_bp.route("/consultar", methods=["POST"])
 def consultar():
     data = request.get_json()
-    
-    # Validar que se proporcione connection_string o conexion_id + credenciales
-    if "connection_string" in data:
+
+    # 1) Resolver cadena de conexión (o rechazar si faltan datos)
+    if data.get("connection_string"):
         connection_string = data["connection_string"]
-        print(f"\n=== DEBUG CONSULTAR (usando connection_string) ===")
+        print("\n=== DEBUG CONSULTAR (usando connection_string recibido) ===")
         print(f"Connection String: {connection_string}")
-        print(f"===========================================\n")
-    elif all(field in data for field in ["conexion_id", "username", "password"]):
-        # Obtener la conexión
+        print("===========================================================\n")
+    elif all(k in data for k in ("conexion_id", "username", "password")):
         conexion = Conection.query.get(data["conexion_id"])
         if not conexion:
             return jsonify({"error": "Conexión no encontrada"}), 404
-        
-        # Construir connection string
-        connection_string = (
-            f"mssql+pyobdc://{data['username']}:{data['password']}"
-            f"@{conexion.obtener_ip()}:{conexion.obtener_port()}/{conexion.obtener_database()}?"
-            "use_tls=true&autocommit=true"
-            ).format(
-                user=data["username"],
-                pwd=data["password"],
-                host=conexion.obtener_ip(),
-                port=conexion.obtener_port(),
-                db=conexion.obtener_database(),
-            )
-        print(f"\n=== DEBUG CONSULTAR (usando conexion_id + credenciales) ===")
+
+        connection_string = _build_pyodbc_sqlalchemy_url(
+            ip=conexion.obtener_ip(),
+            port=conexion.obtener_port(),            # usa coma para puerto
+            database=conexion.obtener_database(),
+            user=data["username"],
+            pwd=data["password"],
+        )
+
+        print("\n=== DEBUG CONSULTAR (usando conexion_id + credenciales) ===")
         print(f"Conexión ID: {data['conexion_id']}")
-        print(f"Connection String: {connection_string}")
-        print(f"=========================================================\n")
+        print(f"Connection String (pyodbc/odbc_connect): {connection_string}")
+        print("===========================================================\n")
     else:
-        # Error si no se proporcionan datos de conexión
         return jsonify({
             "error": "Se requiere connection_string o conexion_id + username + password para realizar la consulta"
         }), 400
 
-    engine = db.engine
-    engine_consultas = create_engine(connection_string, connect_args={"timeout": 5})
-
-    data = request.get_json()
+    # 2) Preparar contexto para el LLM (tu BD interna para inspección)
+    engine_meta = db.engine
     prompt_usuario = data["prompt"]
-    esquema = obtener_esquema_ligero(prompt_usuario, engine)
+
+    esquema = obtener_esquema_ligero(prompt_usuario, engine_meta)
     ruta_documentacion = r"C:\Users\nanog\OneDrive\Desktop\proyectoCziber\proyecCziber\contexto"
     contexto_pdf = extraer_texto_de_pdfs(ruta_documentacion)
 
@@ -488,9 +505,8 @@ def consultar():
     En caso de que la consulta no sea válida, devuelve el siguiente mensaje de error: Consulta inválida, por favor intente nuevamente.
     """
 
-    # Llamada a OpenAI
+    # 3) Llamada a OpenAI (igual que tenías)
     client = OpenAI(api_key=openai.api_key)
-
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
@@ -500,59 +516,39 @@ def consultar():
     )
 
     sql_generado = response.choices[0].message.content.strip()
-
     if sql_generado.startswith("```"):
         sql_generado = sql_generado.strip("`").strip()
         if sql_generado.lower().startswith("sql"):
             sql_generado = sql_generado[3:].strip()
+
     print(f"SQL Generada: {sql_generado}")
-
-    print("Tokens usados:", response.usage.total_tokens )
-    print("Prompt tokens:", response.usage.prompt_tokens )
+    print("Tokens usados:", response.usage.total_tokens)
+    print("Prompt tokens:", response.usage.prompt_tokens)
     print("Completion tokens:", response.usage.completion_tokens)
-   
-    tokens_in  = response.usage.prompt_tokens 
-    tokens_out = response.usage.completion_tokens 
 
+    # 4) Ejecutar la consulta en la DB destino con SQLAlchemy + pyodbc
     try:
+        engine_consultas = create_engine(connection_string, pool_pre_ping=True)
         with engine_consultas.connect() as conn:
-            resultado = conn.execute(text(sql_generado))
-            print(f"Resultados obtenidos: {resultado.rowcount} filas")
+            result = conn.execute(text(sql_generado))
 
-            rows = resultado.fetchall()
-            columns = list(resultado.keys())
-            data = [list(row) for row in rows]
+            # Intentar leer filas/columnas solo si hay result set
+            try:
+                rows = result.fetchall()
+                columns = list(result.keys())
+            except Exception:
+                rows = []
+                columns = [c for c in getattr(result, "keys", lambda: [])()]
 
-            print(f"Columnas obtenidas: {columns}")
-            print(f"Datos obtenidos: {data}")
+            data_rows = [list(r) for r in rows]
 
             if not rows:
-                return {"sql": sql_generado, "mensaje": "Consulta válida, pero sin resultados."}
-            
-            else:
-                # Agregar la consulta a la base de datos
-                # query = Query(
-                #     prompt = prompt_usuario,
-                #     res_SQL = sql_generado,
-                #     tokens_in = tokens_in,
-                #     tokens_out = tokens_out,
-                #     user_id = data.get("user_id"),
-                #     model_id = data.get("model_id")
-                # )
-                # db.session.add(query)
-                # db.session.commit()
+                return jsonify({"sql": sql_generado, "mensaje": "Consulta válida, pero sin resultados."})
 
-                return jsonify({
-                    "columns": columns,
-                    "data": data
-                })  
-
+            return jsonify({"columns": columns, "data": data_rows})
 
     except Exception as e:
-        return jsonify({
-            "error": str(e),
-            "sql": sql_generado
-        }), 500
+        return jsonify({"error": str(e), "sql": sql_generado}), 500
 
 @cziber_bp.route("/listar_aplicaciones", methods=["GET"])
 def listar_aplicaciones():
