@@ -169,45 +169,62 @@ export default function Home() {
     setShowLoginModal(true);
   };
 
-  const handleLogin = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!selectedConnection || !loginData.username || !loginData.password) {
-      alert("Complete todos los campos");
+const handleLogin = async (e: FormEvent) => {
+  e.preventDefault();
+  if (!selectedConnection || !loginData.username || !loginData.password) {
+    alert("Complete todos los campos");
+    return;
+  }
+
+  try {
+    const r = await fetch(api("/cziber/login_conexion"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "omit", // no usamos cookies/sesión del navegador
+      body: JSON.stringify({
+        conexion_id: selectedConnection.id_conn,
+        username: loginData.username,
+        password: loginData.password,
+      }),
+    });
+
+    // Leemos como texto por si backend devuelve HTML en errores
+    const raw = await r.text();
+    let result: any = {};
+    try { result = JSON.parse(raw); } catch { /* deja raw para debug */ }
+
+    if (!r.ok) {
+      const msg = (result?.error || `Error ${r.status}`) + (result?.details ? `\n\n${result.details}` : "");
+      console.error("Login API error:", msg, raw);
+      alert(msg);
       return;
     }
 
-    try {
-      const r = await fetch(api(`/cziber/login_conexion`), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({
-          conexion_id: selectedConnection.id_conn,
-          username: loginData.username,
-          password: loginData.password,
-        }),
-      });
-      const result = await r.json();
-
-      if (result.error) {
-        alert(result.error);
-        return;
-      }
-      if (result.connection_string) {
-        setCurrentConnectionString(result.connection_string);
-        setShowLoginModal(false);
-        setLoginData({ username: "", password: "" });
-        alert(
-          `Conectado exitosamente a ${selectedConnection.ip}:${
-            selectedConnection.puerto ?? selectedConnection.port
-          }/${selectedConnection.database}`
-        );
-      }
-    } catch (e) {
-      console.error("Error al conectar:", e);
-      alert("Error al intentar conectar a la base de datos");
+    if (!result?.connection_string) {
+      console.warn("Respuesta sin connection_string:", result);
+      alert("La conexión fue válida, pero no recibí la cadena de conexión.");
+      return;
     }
-  };
+
+    // Guardamos para reusar en /consultar
+    setCurrentConnectionString(result.connection_string);
+    try { sessionStorage.setItem("cziber_cs", result.connection_string); } catch {}
+
+    // Cerramos modal y limpiamos credenciales
+    setShowLoginModal(false);
+    setLoginData({ username: "", password: "" });
+
+    alert(
+      `Conectado exitosamente a ${selectedConnection.ip}:${
+        selectedConnection.puerto ?? selectedConnection.port
+      }/${selectedConnection.database}`
+    );
+  } catch (err) {
+    console.error("Error al conectar:", err);
+    alert("Error al intentar conectar a la base de datos");
+  }
+};
+
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
